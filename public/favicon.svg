@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="512" height="512">
+  <defs>
+    <linearGradient id="goldHexGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D9A838" />
+      <stop offset="50%" stop-color="#C59228" />
+      <stop offset="100%" stop-color="#A4771C" />
+    </linearGradient>
+  </defs>
+
+  <!-- Dark Slate Background for high contrast icon presentation -->
+  <rect width="200" height="200" rx="32" fill="#0f172a" />
+
+  <!-- Flat-top Hexagon with smooth rounded corners -->
+  <g transform="translate(10, 10) scale(0.9)">
+    <path
+      d="M 66 22 
+         L 134 22 
+         Q 148 22 156 35 
+         L 190 91 
+         Q 196 100 190 109 
+         L 156 165 
+         Q 148 178 134 178 
+         L 66 178 
+         Q 52 178 44 165 
+         L 10 109 
+         Q 4 100 10 91 
+         L 44 35 
+         Q 52 22 66 22 Z"
+      fill="url(#goldHexGradient)"
+    />
+
+    <!-- Stylized Double-Track "G" in crisp white -->
+    <!-- Outer Loop -->
+    <path
+      d="M 138 60 
+         L 92 60 
+         A 42 42 0 0 0 50 102 
+         A 42 42 0 0 0 92 144 
+         L 138 144 
+         L 138 100 
+         L 102 100"
+      stroke="#FFFFFF"
+      stroke-width="13"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      fill="none"
+    />
+
+    <!-- Inner Loop -->
+    <path
+      d="M 138 80 
+         L 94 80 
+         A 22 22 0 0 0 72 102 
+         A 22 22 0 0 0 94 124 
+         L 124 124"
+      stroke="#FFFFFF"
+      stroke-width="13"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      fill="none"
+    />
+  </g>
+</svg>

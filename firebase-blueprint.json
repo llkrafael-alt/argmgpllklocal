@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "users": {
+      "title": "Users",
+      "description": "System users and warehouse operators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "email": { "type": "string" },
+        "login": { "type": "string" },
+        "password": { "type": "string" },
+        "badgeColor": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "isGoogleAuth": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "role"]
+    },
+    "holes": {
+      "title": "Drill Holes",
+      "description": "Geological drill holes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "holeType": { "type": "string" },
+        "startMeter": { "type": "number" },
+        "endMeter": { "type": "number" },
+        "totalMeters": { "type": "number" },
+        "target": { "type": "string" },
+        "totalCases": { "type": "number" },
+        "isLegacyKorePending": { "type": "boolean" },
+        "createdByUserId": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "storageLocation": { "type": "string" },
+        "completedAt": { "type": "string" },
+        "firstSampleCode": { "type": "string" },
+        "lastSampleCode": { "type": "string" },
+        "calculatedSampleCount": { "type": "number" }
+      },
+      "required": ["id", "code", "startMeter", "endMeter", "totalMeters"]
+    },
+    "logs": {
+      "title": "Production Logs",
+      "description": "Daily production logs per stage and interval",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "drillHoleId": { "type": "string" },
+        "stageId": { "type": "number" },
+        "startMeter": { "type": "number" },
+        "endMeter": { "type": "number" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "drillHoleId", "stageId", "startMeter", "endMeter", "userId"]
+    },
+    "ars": {
+      "title": "Sample Shipments AR",
+      "description": "Lab shipment authorizations with QA/QC samples",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "arCode": { "type": "string" },
+        "drillHoleId": { "type": "string" },
+        "drillHoleCode": { "type": "string" },
+        "startSampleCode": { "type": "string" },
+        "endSampleCode": { "type": "string" },
+        "sampleCount": { "type": "number" },
+        "volumeCount": { "type": "number" },
+        "standardSize": { "type": "number" },
+        "weightKg": { "type": "number" },
+        "shipmentDate": { "type": "string" },
+        "createdById": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "arCode", "drillHoleId", "startSampleCode", "endSampleCode"]
+    },
+    "oreasStock": {
+      "title": "OREAS CRM Stock",
+      "description": "Certified Reference Material stock inventory entries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "quantity": { "type": "number" },
+        "date": { "type": "string" },
+        "lotOrNotes": { "type": "string" },
+        "createdById": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "code", "quantity", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/users" },
+      "description": "System users collection"
+    },
+    "/holes/{holeId}": {
+      "schema": { "$ref": "#/entities/holes" },
+      "description": "Drill holes collection"
+    },
+    "/logs/{logId}": {
+      "schema": { "$ref": "#/entities/logs" },
+      "description": "Production logs collection"
+    },
+    "/ars/{arId}": {
+      "schema": { "$ref": "#/entities/ars" },
+      "description": "Sample shipment authorizations collection"
+    },
+    "/oreasStock/{entryId}": {
+      "schema": { "$ref": "#/entities/oreasStock" },
+      "description": "OREAS CRM stock inventory collection"
+    }
+  }
+}

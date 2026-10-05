@@ -1,0 +1,50 @@
+{
+  "name": "Galpão de Testemunhos - Gestão Operacional de Sondagem",
+  "short_name": "Gestão Galpão",
+  "description": "Sistema de Gestão Operacional e Controle de Caixas de Testemunho de Sondagem de Mineração",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "business", "utilities"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/?tab=dashboard",
+      "description": "Acessar o Painel Principal"
+    },
+    {
+      "name": "Equipe / Usuários",
+      "url": "/?tab=team",
+      "description": "Ver Produção da Equipe"
+    }
+  ]
+}

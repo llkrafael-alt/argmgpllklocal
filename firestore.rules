@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow team collaboration across warehouse collections
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    match /holes/{holeId} {
+      allow read, write: if true;
+    }
+    match /logs/{logId} {
+      allow read, write: if true;
+    }
+    match /ars/{arId} {
+      allow read, write: if true;
+    }
+    match /oreasStock/{entryId} {
+      allow read, write: if true;
+    }
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+

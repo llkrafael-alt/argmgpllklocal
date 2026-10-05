@@ -1,0 +1,926 @@
+@import "tailwindcss";
+
+@layer base {
+  :root, body {
+    font-family: "Calibri", "Calibre", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  }
+}
+
+@theme {
+  --font-sans: "Calibri", "Calibre", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 6mm;
+  }
+
+  html,
+  body,
+  #root,
+  #root > div {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Unset overflow clipping on parents in print mode */
+  #root,
+  #root > div,
+  main,
+  div[class*="fixed"],
+  div[class*="overflow-"] {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Hide header, navigation, footer, toasts, buttons, and explicit no-print elements */
+  .no-print,
+  .no-print *,
+  header,
+  header *,
+  nav,
+  nav *,
+  footer,
+  footer *,
+  button {
+    display: none !important;
+  }
+
+  /* When printing from modal dialogs, completely hide the underlying main app layout so it does not create blank pages */
+  body:has(#printable-packing-plan) main,
+  body:has(#printable-qaqc-photo-album) main,
+  body.print-packing-plan-active main,
+  body.print-packing-plan-active header,
+  body.print-packing-plan-active nav,
+  body.print-packing-plan-active footer {
+    display: none !important;
+  }
+
+  /* Reset all modal containers so they don't clip, scroll, or create extra pages */
+  div[class*="fixed"],
+  div[class*="backdrop-blur"],
+  div[class*="overflow-y-auto"],
+  div[class*="overflow-x-auto"] {
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Strict Single-Page Packing Plan Document */
+  #printable-packing-plan {
+    visibility: visible !important;
+    display: block !important;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  /* Photo album and lab report printable targets */
+  #printable-qaqc-photo-album,
+  #printable-lab-report,
+  .print-area {
+    visibility: visible !important;
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  /* Ensure all contents inside print targets are visible */
+  #printable-packing-plan *,
+  #printable-qaqc-photo-album *,
+  #printable-lab-report *,
+  .print-area * {
+    visibility: visible !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+  }
+
+  /* Preserve table header shading */
+  #printable-packing-plan th,
+  #printable-lab-report th,
+  .print-bg-slate {
+    background-color: #f1f5f9 !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure images in print target containers display correctly */
+  #printable-packing-plan img,
+  #printable-qaqc-photo-album img,
+  #printable-lab-report img,
+  .print-area img {
+    visibility: visible !important;
+    display: block !important;
+    max-width: 100% !important;
+    height: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure AppLogo SVG elements render crisply in print mode */
+  .app-logo,
+  .app-logo *,
+  .app-logo-svg,
+  .app-logo-svg * {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .logo-hex-bg {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    fill: #c59228 !important; /* Gold hex fill fallback for print engines */
+  }
+
+  .logo-track {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    stroke: #ffffff !important; /* White tracks on gold background */
+  }
+
+  .print-area h2,
+  .print-area h3,
+  .print-area p,
+  .print-area span,
+  .print-area div {
+    color: #000000 !important;
+  }
+
+  .print-table {
+    border: 1.5px solid #000000 !important;
+    width: 100% !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    border-collapse: collapse !important;
+    font-family: "Calibri", "Calibre", sans-serif !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  .print-table tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-table th {
+    background-color: #d1d5db !important; /* Grey header matching image */
+    color: #000000 !important;
+    border: 1px solid #000000 !important;
+    padding: 3.5px 6px !important;
+    font-weight: 800 !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+  }
+
+  .print-table td {
+    color: #000000 !important;
+    border: 1px solid #000000 !important;
+    padding: 2.5px 6px !important;
+    background: #ffffff !important;
+    text-align: center !important;
+    font-weight: 600 !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+  }
+
+  .print-table tfoot tr,
+  .print-table tfoot td {
+    background-color: #d1d5db !important; /* Grey total footer matching image */
+    color: #000000 !important;
+    font-weight: 800 !important;
+    border: 1px solid #000000 !important;
+    text-align: center !important;
+    font-size: 10px !important;
+    padding: 3px 6px !important;
+  }
+
+  /* QA/QC Standards Report Print Styles */
+  .print-table tr.standards-header-row td,
+  .print-table tr.standards-header-row th {
+    background-color: #fde8d7 !important; /* Light peach/orange background matching image */
+    color: #000000 !important;
+    font-weight: 800 !important;
+    border: 1px solid #000000 !important;
+    text-align: center !important;
+    font-size: 10px !important;
+    padding: 3px 6px !important;
+  }
+
+  .print-table tr.standards-data-row td {
+    background-color: #e5e7eb !important; /* Light grey background matching image */
+    color: #000000 !important;
+    font-weight: 700 !important;
+    border: 1px solid #000000 !important;
+    text-align: center !important;
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+
+  .print-area button.no-print,
+  .print-area .no-print {
+    display: none !important;
+  }
+
+  .print-area .overflow-x-auto {
+    overflow: visible !important;
+  }
+}
+
+/* ==========================================================
+   THEME: BRANCO GELO (LIGHT MODE) STYLING & OVERRIDES
+   ========================================================== */
+html.theme-light,
+body.theme-light,
+.theme-light {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Base App Containers */
+.theme-light .min-h-screen {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Header & Sticky Elements */
+.theme-light header {
+  background-color: #ffffff !important;
+  border-bottom-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.theme-light header h1,
+.theme-light header h2,
+.theme-light header span.text-white {
+  color: #78350f !important; /* Golden Dark Amber Brand Title */
+}
+
+/* Header Navigation Tabs & Controls in Light Theme */
+.theme-light header button {
+  background-color: #ffffff !important;
+  color: #334155 !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.theme-light header button:hover {
+  background-color: #fff7ed !important; /* Levemente laranja no hover */
+  color: #ea580c !important; /* Texto/ícone laranja */
+  border-color: #fed7aa !important;
+}
+
+.theme-light header button.bg-amber-500 {
+  background-color: #f59e0b !important;
+  color: #0f172a !important;
+}
+
+.theme-light header button.bg-amber-500:hover {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+}
+
+/* Tab Inactive State: Clean White */
+.theme-light header button.border-transparent {
+  background-color: #ffffff !important;
+  color: #475569 !important;
+  border-bottom-color: transparent !important;
+}
+
+.theme-light header button.border-transparent:hover {
+  background-color: #fff7ed !important; /* Levemente laranja */
+  color: #ea580c !important;
+  border-bottom-color: #fdba74 !important;
+}
+
+/* Tab Active State: White with Soft Orange Tint & Bold Orange Bottom Border */
+.theme-light header button.border-amber-500,
+.theme-light header button.border-cyan-500 {
+  border-bottom-color: #ea580c !important;
+  color: #ea580c !important;
+  background-color: #fff7ed !important; /* Levemente laranja */
+  font-weight: 800 !important;
+}
+
+/* Count Pills / Badges inside Header Buttons (White base, Orange on Hover/Active) */
+.theme-light header button span.rounded-full {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+  font-weight: 700 !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.theme-light header button:hover span.rounded-full,
+.theme-light header button.border-amber-500 span.rounded-full,
+.theme-light header button.border-cyan-500 span.rounded-full {
+  background-color: #ffedd5 !important; /* Levemente laranja */
+  border-color: #f59e0b !important;
+  color: #9a3412 !important;
+  font-weight: 800 !important;
+}
+
+/* Operator Badge Container in Header */
+.theme-light header .bg-slate-800\/60,
+.theme-light header .bg-slate-800\/80,
+.theme-light header .bg-slate-800 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Card Overrides (Slate 950 / Slate 900 / Slate 800 to Pure White Cards) */
+.theme-light .bg-slate-950,
+.theme-light .bg-slate-950\/90,
+.theme-light .bg-slate-950\/80,
+.theme-light .bg-slate-950\/70,
+.theme-light .bg-slate-950\/60,
+.theme-light .bg-slate-950\/50,
+.theme-light .bg-slate-950\/40,
+.theme-light .bg-slate-950\/30,
+.theme-light .bg-slate-950\/20,
+.theme-light .bg-slate-950\/10,
+.theme-light .bg-slate-900,
+.theme-light .bg-slate-900\/90,
+.theme-light .bg-slate-900\/80,
+.theme-light .bg-slate-900\/70,
+.theme-light .bg-slate-900\/60,
+.theme-light .bg-slate-900\/50,
+.theme-light .bg-slate-900\/40,
+.theme-light .bg-slate-900\/30,
+.theme-light .bg-slate-900\/20,
+.theme-light .bg-slate-900\/10,
+.theme-light .bg-slate-800,
+.theme-light .bg-slate-800\/90,
+.theme-light .bg-slate-800\/80,
+.theme-light .bg-slate-800\/70,
+.theme-light .bg-slate-800\/60,
+.theme-light .bg-slate-800\/50,
+.theme-light .bg-slate-800\/40,
+.theme-light .bg-slate-800\/30,
+.theme-light .bg-slate-800\/20,
+.theme-light .bg-slate-800\/10,
+.theme-light .bg-sky-950,
+.theme-light .bg-sky-950\/90,
+.theme-light .bg-sky-900,
+.theme-light .bg-sky-900\/50 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Hover effect on Cards & Containers: Smoky Orange Border & Glow (Borda Laranja Esfumaçado) */
+.theme-light .rounded-2xl,
+.theme-light .rounded-xl {
+  transition: all 0.25s ease-in-out !important;
+}
+
+.theme-light .rounded-2xl:hover,
+.theme-light .rounded-xl:hover,
+.theme-light div.bg-slate-900:hover,
+.theme-light div.bg-slate-950:hover,
+.theme-light div.border-slate-800:hover {
+  border-color: #f97316 !important;
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.35), 0 4px 18px rgba(249, 115, 22, 0.15) !important;
+}
+
+/* Tables inside light theme: Clean Pure White Base */
+.theme-light table,
+.theme-light thead,
+.theme-light tbody,
+.theme-light tr,
+.theme-light td {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light th {
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+  border-color: #e2e8f0 !important;
+  font-weight: 700 !important;
+}
+
+/* Table Row Hover: Light Orange Tint & Smoky Orange Border Glow */
+.theme-light tbody tr {
+  transition: all 0.2s ease-in-out !important;
+}
+
+.theme-light tbody tr:hover,
+.theme-light tr:hover,
+.theme-light .hover\:bg-slate-800\/50:hover,
+.theme-light .hover\:bg-slate-800\/40:hover,
+.theme-light .hover\:bg-slate-800\/60:hover {
+  background-color: #fff7ed !important; /* Levemente laranja */
+  border-color: #f97316 !important; /* Borda laranja esfumaçado */
+  box-shadow: 0 0 14px rgba(249, 115, 22, 0.25), inset 0 0 0 1px #fb923c !important;
+}
+
+/* Borders */
+.theme-light .border-slate-800,
+.theme-light .border-slate-800\/80,
+.theme-light .border-slate-700,
+.theme-light .border-slate-700\/80,
+.theme-light .divide-slate-800 > * + * {
+  border-color: #e2e8f0 !important;
+}
+
+/* Text Hierarchy Overrides */
+.theme-light .text-white,
+.theme-light .text-slate-100,
+.theme-light .text-slate-200 {
+  color: #0f172a !important;
+}
+
+.theme-light .text-slate-300,
+.theme-light .text-slate-400 {
+  color: #334155 !important;
+}
+
+.theme-light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Inputs, Selects, Textareas */
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Modals & Overlays */
+.theme-light .fixed.inset-0.bg-slate-950\/80,
+.theme-light .fixed.inset-0.bg-black\/70,
+.theme-light .fixed.inset-0.bg-slate-950\/90 {
+  background-color: rgba(15, 23, 42, 0.4) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* Accent Badges / Pills tweaks for light theme (Gold/Amber/Orange tones) */
+.theme-light .text-cyan-300,
+.theme-light .text-cyan-400,
+.theme-light .text-cyan-500 {
+  color: #b45309 !important; /* Deep Gold/Amber */
+}
+
+.theme-light .bg-cyan-950,
+.theme-light .bg-cyan-950\/80,
+.theme-light .bg-cyan-950\/60,
+.theme-light .bg-cyan-900,
+.theme-light .bg-cyan-500\/10,
+.theme-light .bg-cyan-500\/20 {
+  background-color: #fef3c7 !important; /* Soft Amber-Gold fill */
+}
+
+.theme-light .hover\:bg-cyan-900:hover,
+.theme-light .hover\:bg-cyan-950:hover {
+  background-color: #fde68a !important;
+}
+
+.theme-light .border-cyan-800,
+.theme-light .border-cyan-700,
+.theme-light .border-cyan-500\/30 {
+  border-color: #f59e0b !important; /* Gold border */
+}
+
+/* Accent Badges, Highlights (Emerald -> Golden Orange) */
+.theme-light .text-emerald-300,
+.theme-light .text-emerald-400,
+.theme-light .text-emerald-500 {
+  color: #c2410c !important; /* Golden Orange */
+}
+
+.theme-light .bg-emerald-950,
+.theme-light .bg-emerald-950\/80,
+.theme-light .bg-emerald-950\/60,
+.theme-light .bg-emerald-900,
+.theme-light .bg-emerald-500\/10,
+.theme-light .bg-emerald-500\/20 {
+  background-color: #fff7ed !important; /* Light Gold-Orange fill */
+}
+
+.theme-light .border-emerald-800,
+.theme-light .border-emerald-700,
+.theme-light .border-emerald-500\/30 {
+  border-color: #fed7aa !important;
+}
+
+/* Accent Badges, Highlights (Purple -> Rich Gold) */
+.theme-light .text-purple-300,
+.theme-light .text-purple-400,
+.theme-light .text-purple-500 {
+  color: #92400e !important; /* Rich Dark Gold */
+}
+
+.theme-light .bg-purple-950,
+.theme-light .bg-purple-900,
+.theme-light .bg-purple-500\/10,
+.theme-light .bg-purple-500\/20 {
+  background-color: #fef9c3 !important; /* Light Gold fill */
+}
+
+.theme-light .border-purple-800,
+.theme-light .border-purple-700,
+.theme-light .border-purple-500\/30 {
+  border-color: #fef08a !important;
+}
+
+/* Amber/Gold default text overrides for high contrast & legibility on light theme */
+.theme-light .text-amber-300,
+.theme-light .text-amber-400 {
+  color: #b45309 !important; /* Darker Gold for legibility on white */
+}
+
+.theme-light .text-amber-500 {
+  color: #d97706 !important;
+}
+
+.theme-light .bg-amber-950,
+.theme-light .bg-amber-950\/80,
+.theme-light .bg-amber-900 {
+  background-color: #fef3c7 !important;
+  color: #78350f !important;
+}
+
+.theme-light .border-amber-500\/30,
+.theme-light .border-amber-800 {
+  border-color: #f59e0b !important;
+}
+
+/* Tables inside light theme */
+.theme-light table {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light th {
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light td {
+  border-color: #f1f5f9 !important;
+}
+
+.theme-light tr:hover {
+  background-color: #f8fafc !important;
+}
+
+.theme-light .divide-slate-800 > * + *,
+.theme-light .divide-slate-800\/80 > * + * {
+  border-color: #e2e8f0 !important;
+}
+
+/* ==========================================================
+   THEME: GEOLOGIA ESMERALDA (MINERAL EMERALD & GOLD)
+   ========================================================== */
+html.theme-emerald,
+body.theme-emerald,
+.theme-emerald {
+  background-color: #022c22 !important;
+  color: #ecfdf5 !important;
+}
+
+.theme-emerald .min-h-screen {
+  background-color: #022c22 !important;
+  color: #ecfdf5 !important;
+}
+
+.theme-emerald header {
+  background-color: #064e3b !important;
+  border-bottom-color: #047857 !important;
+  box-shadow: 0 4px 20px rgba(6, 78, 59, 0.4);
+}
+
+.theme-emerald .bg-slate-950,
+.theme-emerald .bg-slate-950\/90,
+.theme-emerald .bg-slate-950\/80 {
+  background-color: #032e25 !important;
+  border-color: #065f46 !important;
+}
+
+.theme-emerald .bg-slate-900,
+.theme-emerald .bg-slate-900\/90,
+.theme-emerald .bg-slate-900\/80 {
+  background-color: #043e33 !important;
+  border-color: #059669 !important;
+}
+
+.theme-emerald .bg-slate-800,
+.theme-emerald .bg-slate-800\/80 {
+  background-color: #065f46 !important;
+  border-color: #10b981 !important;
+}
+
+.theme-emerald .border-slate-800,
+.theme-emerald .border-slate-700 {
+  border-color: #047857 !important;
+}
+
+.theme-emerald .text-amber-400,
+.theme-emerald .text-amber-300 {
+  color: #34d399 !important;
+}
+
+.theme-emerald .bg-amber-500 {
+  background-color: #10b981 !important;
+  color: #022c22 !important;
+}
+
+.theme-emerald .bg-amber-500:hover {
+  background-color: #059669 !important;
+}
+
+/* ==========================================================
+   THEME: COBALTO & CIANO TÉCNICO (CYBERPUNK PRECISION)
+   ========================================================== */
+html.theme-cyberpunk,
+body.theme-cyberpunk,
+.theme-cyberpunk {
+  background-color: #030712 !important;
+  color: #f0fdfa !important;
+}
+
+.theme-cyberpunk .min-h-screen {
+  background-color: #030712 !important;
+  color: #f0fdfa !important;
+}
+
+.theme-cyberpunk header {
+  background-color: #0b132b !important;
+  border-bottom-color: #0891b2 !important;
+  box-shadow: 0 4px 20px rgba(8, 145, 178, 0.25);
+}
+
+.theme-cyberpunk .bg-slate-950,
+.theme-cyberpunk .bg-slate-950\/90,
+.theme-cyberpunk .bg-slate-950\/80 {
+  background-color: #070d1e !important;
+  border-color: #164e63 !important;
+}
+
+.theme-cyberpunk .bg-slate-900,
+.theme-cyberpunk .bg-slate-900\/90,
+.theme-cyberpunk .bg-slate-900\/80 {
+  background-color: #0c1833 !important;
+  border-color: #0e7490 !important;
+}
+
+.theme-cyberpunk .bg-slate-800,
+.theme-cyberpunk .bg-slate-800\/80 {
+  background-color: #162a52 !important;
+  border-color: #06b6d4 !important;
+}
+
+.theme-cyberpunk .border-slate-800,
+.theme-cyberpunk .border-slate-700 {
+  border-color: #155e75 !important;
+}
+
+.theme-cyberpunk .text-amber-400,
+.theme-cyberpunk .text-amber-300 {
+  color: #22d3ee !important;
+}
+
+.theme-cyberpunk .bg-amber-500 {
+  background-color: #06b6d4 !important;
+  color: #030712 !important;
+}
+
+.theme-cyberpunk .bg-amber-500:hover {
+  background-color: #0891b2 !important;
+}
+
+/* ==========================================================
+   THEME: TERRACOTA & COBRE MINERAÇÃO (WARM EARTH)
+   ========================================================== */
+html.theme-warm-earth,
+body.theme-warm-earth,
+.theme-warm-earth {
+  background-color: #1c1917 !important;
+  color: #fafaf9 !important;
+}
+
+.theme-warm-earth .min-h-screen {
+  background-color: #1c1917 !important;
+  color: #fafaf9 !important;
+}
+
+.theme-warm-earth header {
+  background-color: #292524 !important;
+  border-bottom-color: #c2410c !important;
+  box-shadow: 0 4px 20px rgba(194, 65, 12, 0.25);
+}
+
+.theme-warm-earth .bg-slate-950,
+.theme-warm-earth .bg-slate-950\/90,
+.theme-warm-earth .bg-slate-950\/80 {
+  background-color: #231f1d !important;
+  border-color: #78350f !important;
+}
+
+.theme-warm-earth .bg-slate-900,
+.theme-warm-earth .bg-slate-900\/90,
+.theme-warm-earth .bg-slate-900\/80 {
+  background-color: #2c2523 !important;
+  border-color: #9a3412 !important;
+}
+
+.theme-warm-earth .bg-slate-800,
+.theme-warm-earth .bg-slate-800\/80 {
+  background-color: #443733 !important;
+  border-color: #ea580c !important;
+}
+
+.theme-warm-earth .border-slate-800,
+.theme-warm-earth .border-slate-700 {
+  border-color: #57423b !important;
+}
+
+.theme-warm-earth .text-amber-400,
+.theme-warm-earth .text-amber-300 {
+  color: #fb923c !important;
+}
+
+.theme-warm-earth .bg-amber-500 {
+  background-color: #f97316 !important;
+  color: #1c1917 !important;
+}
+
+.theme-warm-earth .bg-amber-500:hover {
+  background-color: #ea580c !important;
+}
+
+/* ==========================================================
+   THEME: AMETISTA & GALENA (DRACULA NIGHT)
+   ========================================================== */
+html.theme-dracula-night,
+body.theme-dracula-night,
+.theme-dracula-night {
+  background-color: #130c24 !important;
+  color: #faf5ff !important;
+}
+
+.theme-dracula-night .min-h-screen {
+  background-color: #130c24 !important;
+  color: #faf5ff !important;
+}
+
+.theme-dracula-night header {
+  background-color: #1e1338 !important;
+  border-bottom-color: #9333ea !important;
+  box-shadow: 0 4px 20px rgba(147, 51, 234, 0.25);
+}
+
+.theme-dracula-night .bg-slate-950,
+.theme-dracula-night .bg-slate-950\/90,
+.theme-dracula-night .bg-slate-950\/80 {
+  background-color: #190f30 !important;
+  border-color: #581c87 !important;
+}
+
+.theme-dracula-night .bg-slate-900,
+.theme-dracula-night .bg-slate-900\/90,
+.theme-dracula-night .bg-slate-900\/80 {
+  background-color: #231642 !important;
+  border-color: #7e22ce !important;
+}
+
+.theme-dracula-night .bg-slate-800,
+.theme-dracula-night .bg-slate-800\/80 {
+  background-color: #351c66 !important;
+  border-color: #a855f7 !important;
+}
+
+.theme-dracula-night .border-slate-800,
+.theme-dracula-night .border-slate-700 {
+  border-color: #4c1d95 !important;
+}
+
+.theme-dracula-night .text-amber-400,
+.theme-dracula-night .text-amber-300 {
+  color: #c084fc !important;
+}
+
+.theme-dracula-night .bg-amber-500 {
+  background-color: #a855f7 !important;
+  color: #130c24 !important;
+}
+
+.theme-dracula-night .bg-amber-500:hover {
+  background-color: #9333ea !important;
+}
+
+/* ==========================================================
+   THEME: MONOCROMÁTICO ALTO CONTRASTE (OLED / PURE B&W)
+   ========================================================== */
+html.theme-mono-clean,
+body.theme-mono-clean,
+.theme-mono-clean {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+.theme-mono-clean .min-h-screen {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+.theme-mono-clean header {
+  background-color: #000000 !important;
+  border-bottom-color: #ffffff !important;
+  box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
+}
+
+.theme-mono-clean .bg-slate-950,
+.theme-mono-clean .bg-slate-950\/90,
+.theme-mono-clean .bg-slate-950\/80 {
+  background-color: #080808 !important;
+  border-color: #404040 !important;
+}
+
+.theme-mono-clean .bg-slate-900,
+.theme-mono-clean .bg-slate-900\/90,
+.theme-mono-clean .bg-slate-900\/80 {
+  background-color: #121212 !important;
+  border-color: #525252 !important;
+}
+
+.theme-mono-clean .bg-slate-800,
+.theme-mono-clean .bg-slate-800\/80 {
+  background-color: #262626 !important;
+  border-color: #737373 !important;
+}
+
+.theme-mono-clean .border-slate-800,
+.theme-mono-clean .border-slate-700 {
+  border-color: #404040 !important;
+}
+
+.theme-mono-clean .text-amber-400,
+.theme-mono-clean .text-amber-300 {
+  color: #ffffff !important;
+}
+
+.theme-mono-clean .bg-amber-500 {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+.theme-mono-clean .bg-amber-500:hover {
+  background-color: #e5e5e5 !important;
+}
+
+
+

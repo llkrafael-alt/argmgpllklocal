@@ -1,0 +1,8 @@
+{
+  "name": "Remix local",
+  "description": "Sistema de controle e gestão operacional de furos de sondagem, caixas e etapas de fluxo de testemunhos de mineração.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

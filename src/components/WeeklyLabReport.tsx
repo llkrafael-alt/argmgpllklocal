@@ -99,7 +99,7 @@ export const WeeklyLabReport: React.FC<WeeklyLabReportProps> = ({
     if (reportMode === 'summary') {
       tsv += `RELATÓRIO DE ENVIO DE AMOSTRAS PARA LABORATÓRIO\n`;
       tsv += `Data do Envio / Referência: ${selectedDate === 'all' ? 'Todas as Datas' : formatDateToPtBR(selectedDate)}\n\n`;
-      tsv += `NOME\tNº\tFROM\tTO\tAMOSTRAS\tVOLUME\tKG\n`;
+      tsv += `NAME\tNº\tFROM\tTO\tSAMPLES\tVOLUMES\tKG\n`;
 
       reportARs.forEach((ar) => {
         const holeCode = ar.drillHoleCode || holes.find((h) => h.id === ar.drillHoleId)?.code || '-';
@@ -141,7 +141,7 @@ export const WeeklyLabReport: React.FC<WeeklyLabReportProps> = ({
   const handleExportCSV = () => {
     let csv = '';
     if (reportMode === 'summary') {
-      csv += `NOME,Nº,FROM,TO,AMOSTRAS,VOLUME,KG\n`;
+      csv += `NAME,Nº,FROM,TO,SAMPLES,VOLUMES,KG\n`;
 
       reportARs.forEach((ar) => {
         const holeCode = ar.drillHoleCode || holes.find((h) => h.id === ar.drillHoleId)?.code || '-';
@@ -405,12 +405,12 @@ export const WeeklyLabReport: React.FC<WeeklyLabReportProps> = ({
             <table className="print-table w-full text-center text-xs border-collapse border border-slate-700 bg-slate-950/90 rounded-xl overflow-hidden font-mono">
             <thead>
               <tr className="bg-slate-800 text-slate-100 font-black uppercase text-[10.5px] border-b-2 border-slate-700">
-                <th className="py-1.5 px-2.5 border-r border-slate-700 text-center">NOME</th>
+                <th className="py-1.5 px-2.5 border-r border-slate-700 text-center">NAME</th>
                 <th className="py-1.5 px-2.5 border-r border-slate-700 text-center">Nº</th>
                 <th className="py-1.5 px-2.5 border-r border-slate-700 text-center">FROM</th>
                 <th className="py-1.5 px-2.5 border-r border-slate-700 text-center">TO</th>
-                <th className="py-1.5 px-2.5 border-r border-slate-700 text-center">AMOSTRAS</th>
-                <th className="py-1.5 px-2.5 border-r border-slate-700 text-center">VOLUME</th>
+                <th className="py-1.5 px-2.5 border-r border-slate-700 text-center">SAMPLES</th>
+                <th className="py-1.5 px-2.5 border-r border-slate-700 text-center">VOLUMES</th>
                 <th className="py-1.5 px-2.5 text-center">KG</th>
               </tr>
             </thead>

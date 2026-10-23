@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DrillHole, SampleShipmentAR, OreasStockEntry, QAQCSamplePhoto } from '../types';
 import { calculateOreasBalances } from '../utils/oreasStock';
 import { getARVolumeCount, formatDateToPtBR, getNormalizedSampleRanges, isPhotoMatchingAR } from '../utils/calculator';
+import { saveARToDb } from '../services/firebase';
 import { QaqcTableGrid } from './QaqcTableGrid';
 import { WeeklyLabReport } from './WeeklyLabReport';
 import {
@@ -21,6 +22,9 @@ import {
   Package,
   Camera,
   FileText,
+  Check,
+  X,
+  Scale,
 } from 'lucide-react';
 
 interface ShipmentsViewProps {
@@ -32,6 +36,7 @@ interface ShipmentsViewProps {
   onOpenOreasStockModal?: () => void;
   onOpenPdfReportModal?: (date?: string) => void;
   onEditAR: (ar: SampleShipmentAR) => void;
+  onUpdateARWeight?: (arId: string, weightKg: number) => void | Promise<void>;
   onDeleteAR: (arId: string) => void;
   onOpenHoleDetailByCode: (holeCode: string) => void;
   onOpenPackingPlan: (ar: SampleShipmentAR, initialTab?: 'plan' | 'photos') => void;
@@ -46,6 +51,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   onOpenOreasStockModal,
   onOpenPdfReportModal,
   onEditAR,
+  onUpdateARWeight,
   onDeleteAR,
   onOpenHoleDetailByCode,
   onOpenPackingPlan,
@@ -53,6 +59,46 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'report'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState<string>('ALL');
+
+  // Inline weight editing state
+  const [editingWeightArId, setEditingWeightArId] = useState<string | null>(null);
+  const [editingWeightValue, setEditingWeightValue] = useState<string>('');
+  const [isSavingWeight, setIsSavingWeight] = useState(false);
+
+  const handleStartEditWeight = (ar: SampleShipmentAR) => {
+    setEditingWeightArId(ar.id);
+    setEditingWeightValue(
+      ar.weightKg !== undefined && ar.weightKg !== null && ar.weightKg > 0
+        ? String(ar.weightKg)
+        : ''
+    );
+  };
+
+  const handleCancelEditWeight = () => {
+    setEditingWeightArId(null);
+    setEditingWeightValue('');
+  };
+
+  const handleSaveWeight = async (ar: SampleShipmentAR) => {
+    setIsSavingWeight(true);
+    try {
+      const cleaned = editingWeightValue.trim().replace(',', '.');
+      const parsedWeight = cleaned === '' ? 0 : parseFloat(cleaned);
+      const finalWeight = isNaN(parsedWeight) || parsedWeight < 0 ? 0 : Number(parsedWeight.toFixed(2));
+
+      if (onUpdateARWeight) {
+        await onUpdateARWeight(ar.id, finalWeight);
+      } else {
+        await saveARToDb({ ...ar, weightKg: finalWeight });
+      }
+      setEditingWeightArId(null);
+      setEditingWeightValue('');
+    } catch (err) {
+      console.error('Erro ao salvar peso da AR:', err);
+    } finally {
+      setIsSavingWeight(false);
+    }
+  };
 
   // Available unique shipment dates for quick filtering
   const availableDates: string[] = Array.from<string>(
@@ -322,7 +368,56 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                     </div>
                     <div>
                       <span className="text-[9px] font-bold uppercase text-slate-500 block">Peso</span>
-                      <span className="font-mono font-bold text-purple-300 text-xs">{ar.weightKg ?? 0} kg</span>
+                      {editingWeightArId === ar.id ? (
+                        <div className="mt-1 flex items-center justify-center gap-1">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoFocus
+                            value={editingWeightValue}
+                            onChange={(e) => setEditingWeightValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveWeight(ar);
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                handleCancelEditWeight();
+                              }
+                            }}
+                            placeholder="0.0"
+                            className="w-14 px-1 py-0.5 text-xs text-center font-mono font-bold bg-slate-900 text-purple-200 rounded border border-purple-500 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            disabled={isSavingWeight}
+                            onClick={() => handleSaveWeight(ar)}
+                            className="p-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                            title="Salvar peso"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingWeight}
+                            onClick={handleCancelEditWeight}
+                            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                            title="Cancelar"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditWeight(ar)}
+                          className="font-mono font-bold text-purple-300 text-xs hover:text-purple-200 hover:underline flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                          title="Clique para editar o peso desta AR"
+                        >
+                          <span>{ar.weightKg ?? 0} kg</span>
+                          <Edit2 className="w-2.5 h-2.5 text-purple-400/80" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -469,9 +564,68 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                       {getARVolumeCount(ar)} vol.
                     </td>
 
-                    {/* Weight */}
-                    <td className="py-3.5 px-3 text-center font-mono text-purple-300 font-bold">
-                      {ar.weightKg !== undefined && ar.weightKg !== null ? ar.weightKg : 0} kg
+                    {/* Weight (Inline Editable) */}
+                    <td className="py-3.5 px-3 text-center">
+                      {editingWeightArId === ar.id ? (
+                        <div className="inline-flex items-center gap-1.5 justify-center bg-slate-950 px-2 py-1 rounded-xl border border-purple-500 shadow-lg shadow-purple-950/40">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoFocus
+                            value={editingWeightValue}
+                            onChange={(e) => setEditingWeightValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveWeight(ar);
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                handleCancelEditWeight();
+                              }
+                            }}
+                            placeholder="0.0"
+                            className="w-16 px-1.5 py-1 text-xs text-center font-mono font-bold bg-slate-900 text-purple-200 rounded-lg border border-slate-700 focus:outline-none focus:border-purple-400"
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono font-semibold">kg</span>
+                          <button
+                            type="button"
+                            disabled={isSavingWeight}
+                            onClick={() => handleSaveWeight(ar)}
+                            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
+                            title="Salvar peso (Enter)"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingWeight}
+                            onClick={handleCancelEditWeight}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                            title="Cancelar (Esc)"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditWeight(ar)}
+                          className="group inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-purple-950/40 border border-transparent hover:border-purple-800/60 transition-all cursor-pointer font-mono text-xs"
+                          title="Clique para editar o peso diretamente"
+                        >
+                          {ar.weightKg !== undefined && ar.weightKg !== null && ar.weightKg > 0 ? (
+                            <>
+                              <span className="text-purple-300 font-bold group-hover:text-purple-200">{ar.weightKg} kg</span>
+                              <Edit2 className="w-3 h-3 text-purple-400/50 group-hover:text-purple-300 transition-colors" />
+                            </>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 group-hover:text-purple-300 bg-slate-800/50 group-hover:bg-purple-950/50 px-2 py-0.5 rounded-md border border-dashed border-slate-700 group-hover:border-purple-600 transition-all">
+                              <Scale className="w-3 h-3 text-purple-400" />
+                              <span>Inserir peso</span>
+                            </span>
+                          )}
+                        </button>
+                      )}
                     </td>
 
                     {/* QA/QC Standard Samples */}

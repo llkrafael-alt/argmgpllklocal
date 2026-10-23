@@ -613,6 +613,44 @@ export default function App() {
     []
   );
 
+  // Direct inline update of AR weight
+  const handleUpdateARWeight = useCallback(
+    async (arId: string, weightKg: number) => {
+      try {
+        let arCode = '';
+        setARs((prevARs) => {
+          const targetAR = prevARs.find((a) => a.id === arId);
+          if (!targetAR) return prevARs;
+          arCode = targetAR.arCode;
+          if (targetAR.weightKg === weightKg) {
+            return prevARs;
+          }
+
+          const updatedAR: SampleShipmentAR = {
+            ...targetAR,
+            weightKg,
+          };
+
+          // Synchronize modal state if open
+          setPackingPlanAR((current) => (current && current.id === arId ? updatedAR : current));
+
+          // Persist to database asynchronously
+          saveARToDb(updatedAR).catch((e) =>
+            console.error('Erro ao atualizar peso da AR no banco:', e)
+          );
+
+          return prevARs.map((a) => (a.id === arId ? updatedAR : a));
+        });
+
+        triggerToast(`Peso da AR ${arCode || ''} atualizado para ${weightKg} kg!`);
+      } catch (err) {
+        console.error('Erro ao atualizar peso da AR:', err);
+        triggerToast('Erro ao atualizar peso da AR.');
+      }
+    },
+    [triggerToast]
+  );
+
   const handleDeleteAR = async (arId: string) => {
     try {
       const targetAR = ars.find((a) => a.id === arId);
@@ -1075,6 +1113,8 @@ export default function App() {
             holes={holes}
             ars={ars}
             activeUser={activeUser}
+            oreasStockEntries={oreasStockEntries}
+            logs={logs}
             onOpenHoleDetail={(h) => setDetailHoleId(h.id)}
             onOpenNewHoleModal={() => setIsNewHoleModalOpen(true)}
             onDeleteHoleRequest={(h) => setHoleToDelete(h)}
@@ -1095,6 +1135,7 @@ export default function App() {
             onOpenOreasStockModal={() => setIsOreasStockModalOpen(true)}
             onOpenPdfReportModal={handleOpenPdfReportModal}
             onEditAR={handleOpenEditARModal}
+            onUpdateARWeight={handleUpdateARWeight}
             onDeleteAR={handleDeleteAR}
             onOpenHoleDetailByCode={handleOpenHoleDetailByCode}
             onOpenPackingPlan={handleOpenPackingPlan}

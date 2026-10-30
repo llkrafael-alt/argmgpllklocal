@@ -37,6 +37,7 @@ interface ShipmentsViewProps {
   onOpenPdfReportModal?: (date?: string) => void;
   onEditAR: (ar: SampleShipmentAR) => void;
   onUpdateARWeight?: (arId: string, weightKg: number) => void | Promise<void>;
+  onUpdateARShipmentDate?: (arId: string, shipmentDate: string) => void | Promise<void>;
   onDeleteAR: (arId: string) => void;
   onOpenHoleDetailByCode: (holeCode: string) => void;
   onOpenPackingPlan: (ar: SampleShipmentAR, initialTab?: 'plan' | 'photos') => void;
@@ -52,6 +53,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   onOpenPdfReportModal,
   onEditAR,
   onUpdateARWeight,
+  onUpdateARShipmentDate,
   onDeleteAR,
   onOpenHoleDetailByCode,
   onOpenPackingPlan,
@@ -97,6 +99,40 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
       console.error('Erro ao salvar peso da AR:', err);
     } finally {
       setIsSavingWeight(false);
+    }
+  };
+
+  // Inline shipment date editing state
+  const [editingDateArId, setEditingDateArId] = useState<string | null>(null);
+  const [editingDateValue, setEditingDateValue] = useState<string>('');
+  const [isSavingDate, setIsSavingDate] = useState(false);
+
+  const handleStartEditDate = (ar: SampleShipmentAR) => {
+    setEditingDateArId(ar.id);
+    setEditingDateValue(ar.shipmentDate ? ar.shipmentDate.split('T')[0] : '');
+  };
+
+  const handleCancelEditDate = () => {
+    setEditingDateArId(null);
+    setEditingDateValue('');
+  };
+
+  const handleSaveDate = async (ar: SampleShipmentAR) => {
+    if (!editingDateValue) return;
+    setIsSavingDate(true);
+    try {
+      const cleanDate = editingDateValue.trim();
+      if (onUpdateARShipmentDate) {
+        await onUpdateARShipmentDate(ar.id, cleanDate);
+      } else {
+        await saveARToDb({ ...ar, shipmentDate: cleanDate });
+      }
+      setEditingDateArId(null);
+      setEditingDateValue('');
+    } catch (err) {
+      console.error('Erro ao salvar data de envio da AR:', err);
+    } finally {
+      setIsSavingDate(false);
     }
   };
 
@@ -351,9 +387,55 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                         {ar.drillHoleCode}
                       </button>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-400 font-medium whitespace-nowrap">
-                      {formatDateToPtBR(ar.shipmentDate)}
-                    </span>
+                    {editingDateArId === ar.id ? (
+                      <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-cyan-500 shadow-md">
+                        <input
+                          type="date"
+                          autoFocus
+                          value={editingDateValue}
+                          onChange={(e) => setEditingDateValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveDate(ar);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              handleCancelEditDate();
+                            }
+                          }}
+                          className="text-[11px] font-mono font-bold bg-slate-900 text-cyan-200 rounded border border-slate-700 px-1 py-0.5 outline-none cursor-pointer"
+                        />
+                        <button
+                          type="button"
+                          disabled={isSavingDate || !editingDateValue}
+                          onClick={() => handleSaveDate(ar)}
+                          className="p-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
+                          title="Salvar data"
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingDate}
+                          onClick={handleCancelEditDate}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                          title="Cancelar"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditDate(ar)}
+                        className="text-[11px] font-mono text-slate-400 hover:text-cyan-300 font-medium whitespace-nowrap inline-flex items-center gap-1 group py-0.5 px-1.5 rounded hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Clique para editar a data de envio desta AR"
+                      >
+                        <Calendar className="w-3 h-3 text-cyan-400/60 group-hover:text-cyan-400" />
+                        <span>{formatDateToPtBR(ar.shipmentDate) || 'Definir data'}</span>
+                        <Edit2 className="w-2.5 h-2.5 text-slate-500 group-hover:text-cyan-400 transition-colors" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Sample Count, Volumes & Weight Grid */}
@@ -633,9 +715,57 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                       <QaqcTableGrid samples={ar.qaqcSamples || []} />
                     </td>
 
-                    {/* Date */}
-                    <td className="py-3.5 px-3 text-slate-300 font-mono whitespace-nowrap">
-                      {formatDateToPtBR(ar.shipmentDate)}
+                    {/* Date (Inline Editable) */}
+                    <td className="py-3.5 px-3">
+                      {editingDateArId === ar.id ? (
+                        <div className="inline-flex items-center gap-1.5 justify-center bg-slate-950 px-2 py-1 rounded-xl border border-cyan-500 shadow-lg shadow-cyan-950/40">
+                          <input
+                            type="date"
+                            autoFocus
+                            value={editingDateValue}
+                            onChange={(e) => setEditingDateValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveDate(ar);
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                handleCancelEditDate();
+                              }
+                            }}
+                            className="px-2 py-1 text-xs font-mono font-bold bg-slate-900 text-cyan-200 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-400 cursor-pointer"
+                          />
+                          <button
+                            type="button"
+                            disabled={isSavingDate || !editingDateValue}
+                            onClick={() => handleSaveDate(ar)}
+                            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
+                            title="Salvar data de envio (Enter)"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingDate}
+                            onClick={handleCancelEditDate}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                            title="Cancelar (Esc)"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditDate(ar)}
+                          className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-cyan-950/40 border border-transparent hover:border-cyan-800/60 transition-all cursor-pointer font-mono text-xs text-slate-300 hover:text-cyan-200"
+                          title="Clique para editar a data de envio diretamente"
+                        >
+                          <Calendar className="w-3.5 h-3.5 text-cyan-400/70 group-hover:text-cyan-300 transition-colors" />
+                          <span className="font-medium">{formatDateToPtBR(ar.shipmentDate) || 'Definir data'}</span>
+                          <Edit2 className="w-3 h-3 text-cyan-400/40 group-hover:text-cyan-300 transition-colors ml-0.5" />
+                        </button>
+                      )}
                     </td>
 
                     {/* Actions */}

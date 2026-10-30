@@ -39,7 +39,7 @@ import {
   subscribeFolderSync,
   FolderSyncState,
 } from './utils/fileSystemFolderSync';
-import { parseSampleRange, parseSampleRanges, generateARsForSampleRange, generatePackingPlan } from './utils/calculator';
+import { parseSampleRange, parseSampleRanges, generateARsForSampleRange, generatePackingPlan, formatDateToPtBR } from './utils/calculator';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
 import { UserPanel } from './components/UserPanel';
@@ -651,6 +651,44 @@ export default function App() {
     [triggerToast]
   );
 
+  // Direct inline update of AR shipmentDate
+  const handleUpdateARShipmentDate = useCallback(
+    async (arId: string, shipmentDate: string) => {
+      try {
+        let arCode = '';
+        setARs((prevARs) => {
+          const targetAR = prevARs.find((a) => a.id === arId);
+          if (!targetAR) return prevARs;
+          arCode = targetAR.arCode;
+          if (targetAR.shipmentDate === shipmentDate) {
+            return prevARs;
+          }
+
+          const updatedAR: SampleShipmentAR = {
+            ...targetAR,
+            shipmentDate,
+          };
+
+          // Synchronize modal state if open
+          setPackingPlanAR((current) => (current && current.id === arId ? updatedAR : current));
+
+          // Persist to database asynchronously
+          saveARToDb(updatedAR).catch((e) =>
+            console.error('Erro ao atualizar data de envio da AR no banco:', e)
+          );
+
+          return prevARs.map((a) => (a.id === arId ? updatedAR : a));
+        });
+
+        triggerToast(`Data de envio da AR ${arCode || ''} atualizada para ${formatDateToPtBR(shipmentDate)}!`);
+      } catch (err) {
+        console.error('Erro ao atualizar data de envio da AR:', err);
+        triggerToast('Erro ao atualizar data de envio da AR.');
+      }
+    },
+    [triggerToast]
+  );
+
   const handleDeleteAR = async (arId: string) => {
     try {
       const targetAR = ars.find((a) => a.id === arId);
@@ -1136,6 +1174,7 @@ export default function App() {
             onOpenPdfReportModal={handleOpenPdfReportModal}
             onEditAR={handleOpenEditARModal}
             onUpdateARWeight={handleUpdateARWeight}
+            onUpdateARShipmentDate={handleUpdateARShipmentDate}
             onDeleteAR={handleDeleteAR}
             onOpenHoleDetailByCode={handleOpenHoleDetailByCode}
             onOpenPackingPlan={handleOpenPackingPlan}

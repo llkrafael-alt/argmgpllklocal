@@ -16,7 +16,9 @@ import {
   AlertCircle,
   Truck,
   ShieldCheck,
+  FileText,
 } from 'lucide-react';
+import { OreasStockReportModal } from './OreasStockReportModal';
 
 interface OreasStockModalProps {
   isOpen: boolean;
@@ -27,6 +29,7 @@ interface OreasStockModalProps {
   onSaveEntry: (entry: OreasStockEntry) => void;
   onDeleteEntry: (entryId: string) => void;
   onDeleteCode: (code: string) => void;
+  onOpenReportModal?: () => void;
 }
 
 export const OreasStockModal: React.FC<OreasStockModalProps> = ({
@@ -38,11 +41,13 @@ export const OreasStockModal: React.FC<OreasStockModalProps> = ({
   onSaveEntry,
   onDeleteEntry,
   onDeleteCode,
+  onOpenReportModal,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddingEntry, setIsAddingEntry] = useState(false);
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
   const [codeToDelete, setCodeToDelete] = useState<OreasStockSummaryItem | null>(null);
+  const [isInternalReportOpen, setIsInternalReportOpen] = useState(false);
 
   // New Entry Form State
   const [code, setCode] = useState('');
@@ -128,12 +133,31 @@ export const OreasStockModal: React.FC<OreasStockModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenReportModal) {
+                  onOpenReportModal();
+                } else {
+                  setIsInternalReportOpen(true);
+                }
+              }}
+              className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-md shadow-purple-950/40 border border-purple-500/50"
+              title="Gerar e imprimir relatório de estoque de OREAS"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Gerar Relatório de Estoque</span>
+              <span className="inline sm:hidden">Relatório</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Content */}
@@ -593,6 +617,17 @@ export const OreasStockModal: React.FC<OreasStockModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* OREAS Stock Report Modal */}
+      {isInternalReportOpen && (
+        <OreasStockReportModal
+          isOpen={isInternalReportOpen}
+          onClose={() => setIsInternalReportOpen(false)}
+          oreasStockEntries={oreasStockEntries}
+          ars={ars}
+          activeUser={activeUser}
+        />
       )}
     </div>
   );

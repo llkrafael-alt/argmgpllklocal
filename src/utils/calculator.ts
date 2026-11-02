@@ -644,6 +644,91 @@ export function generatePackingPlan(
   };
 }
 
+/**
+ * Finds the specific packing volume in which a sample code is contained.
+ * Supports numeric ranges with matching or empty prefixes, exact code matches,
+ * and single-volume fallbacks.
+ */
+export function findVolumeForSample(
+  sampleCode: string,
+  volumes: PackingVolume[]
+): PackingVolume | null {
+  if (!sampleCode || !volumes || volumes.length === 0) return null;
+  const trimmed = sampleCode.trim();
+  const s = parseSampleCodeDetails(trimmed);
+
+  if (s && typeof s.num === 'number') {
+    const sPrefix = (s.prefix || '').toUpperCase().trim();
+    for (const vol of volumes) {
+      const from = parseSampleCodeDetails(vol.fromSample);
+      const to = parseSampleCodeDetails(vol.toSample);
+      if (from && to && typeof from.num === 'number' && typeof to.num === 'number') {
+        const vPrefix = (from.prefix || to.prefix || '').toUpperCase().trim();
+        const prefixMatches = !sPrefix || !vPrefix || sPrefix === vPrefix;
+        if (prefixMatches && s.num >= from.num && s.num <= to.num) {
+          return vol;
+        }
+      }
+    }
+  }
+
+  // Exact code match
+  const upperTrimmed = trimmed.toUpperCase();
+  for (const vol of volumes) {
+    if (
+      vol.fromSample.trim().toUpperCase() === upperTrimmed ||
+      vol.toSample.trim().toUpperCase() === upperTrimmed
+    ) {
+      return vol;
+    }
+  }
+
+  // Single volume fallback
+  if (volumes.length === 1) {
+    return volumes[0];
+  }
+
+  return null;
+}
+
+/**
+ * Categorizes and retrieves all QA/QC samples (OREAS, BLK, DUP) belonging to a specific volume.
+ */
+export function getQaqcSamplesForVolume<T extends { id?: string; code?: string; type?: string; oreasProduct?: string; notes?: string }>(
+  vol: PackingVolume,
+  qaqcSamples: T[],
+  volumes: PackingVolume[]
+): {
+  oreas: T[];
+  blk: T[];
+  dup: T[];
+  all: T[];
+} {
+  const volSamples = (qaqcSamples || []).filter((q) => {
+    if (!q || !q.code) return false;
+    const assignedVol = findVolumeForSample(q.code, volumes);
+    return assignedVol?.volumeIndex === vol.volumeIndex;
+  });
+
+  const oreas = volSamples.filter(
+    (q) => (q.type && q.type.toUpperCase().includes('OREAS')) || Boolean(q.oreasProduct)
+  );
+  const blk = volSamples.filter(
+    (q) =>
+      q.type &&
+      (q.type.toUpperCase().includes('BLK') ||
+        q.type.toUpperCase().includes('GESSO') ||
+        q.type.toUpperCase().includes('BRANCO'))
+  );
+  const dup = volSamples.filter(
+    (q) =>
+      q.type &&
+      (q.type.toUpperCase().includes('DUP') || q.type.toUpperCase().includes('DUPLICATA'))
+  );
+
+  return { oreas, blk, dup, all: volSamples };
+}
+
 export function getARVolumeCount(ar: {
   startSampleCode: string;
   endSampleCode: string;

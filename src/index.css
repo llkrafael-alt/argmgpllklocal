@@ -58,6 +58,8 @@
   /* When printing from modal dialogs, completely hide the underlying main app layout so it does not create blank pages */
   body:has(#printable-packing-plan) main,
   body:has(#printable-qaqc-photo-album) main,
+  body:has(#printable-lab-report) main,
+  body:has(#oreas-printable-report) main,
   body.print-packing-plan-active main,
   body.print-packing-plan-active header,
   body.print-packing-plan-active nav,
@@ -110,6 +112,7 @@
   /* Photo album and lab report printable targets */
   #printable-qaqc-photo-album,
   #printable-lab-report,
+  #oreas-printable-report,
   .print-area {
     visibility: visible !important;
     display: block !important;
@@ -129,6 +132,7 @@
   #printable-packing-plan *,
   #printable-qaqc-photo-album *,
   #printable-lab-report *,
+  #oreas-printable-report *,
   .print-area * {
     visibility: visible !important;
     color: #000000 !important;
@@ -138,6 +142,7 @@
   /* Preserve table header shading */
   #printable-packing-plan th,
   #printable-lab-report th,
+  #oreas-printable-report th,
   .print-bg-slate {
     background-color: #f1f5f9 !important;
     color: #000000 !important;

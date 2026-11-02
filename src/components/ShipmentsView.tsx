@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { DrillHole, SampleShipmentAR, OreasStockEntry, QAQCSamplePhoto } from '../types';
+import { DrillHole, SampleShipmentAR, OreasStockEntry, QAQCSamplePhoto, User } from '../types';
 import { calculateOreasBalances } from '../utils/oreasStock';
 import { getARVolumeCount, formatDateToPtBR, getNormalizedSampleRanges, isPhotoMatchingAR } from '../utils/calculator';
 import { saveARToDb } from '../services/firebase';
 import { QaqcTableGrid } from './QaqcTableGrid';
 import { WeeklyLabReport } from './WeeklyLabReport';
+import { OreasStockReportModal } from './OreasStockReportModal';
 import {
   Truck,
   Search,
@@ -32,8 +33,10 @@ interface ShipmentsViewProps {
   holes: DrillHole[];
   oreasStockEntries?: OreasStockEntry[];
   photos?: QAQCSamplePhoto[];
+  activeUser?: User;
   onOpenCreateARModal: () => void;
   onOpenOreasStockModal?: () => void;
+  onOpenOreasReportModal?: () => void;
   onOpenPdfReportModal?: (date?: string) => void;
   onEditAR: (ar: SampleShipmentAR) => void;
   onUpdateARWeight?: (arId: string, weightKg: number) => void | Promise<void>;
@@ -48,8 +51,10 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   holes,
   oreasStockEntries = [],
   photos = [],
+  activeUser,
   onOpenCreateARModal,
   onOpenOreasStockModal,
+  onOpenOreasReportModal,
   onOpenPdfReportModal,
   onEditAR,
   onUpdateARWeight,
@@ -61,6 +66,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'report'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState<string>('ALL');
+  const [isOreasReportModalOpen, setIsOreasReportModalOpen] = useState(false);
 
   // Inline weight editing state
   const [editingWeightArId, setEditingWeightArId] = useState<string | null>(null);
@@ -185,7 +191,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   return (
     <div className="flex flex-col gap-6 pb-12">
       {/* SubTab Navigation Switcher & Actions */}
-      <div className="no-print grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 border-b border-slate-800 pb-2">
+      <div className="no-print grid grid-cols-2 sm:grid-cols-4 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 border-b border-slate-800 pb-2">
         <button
           onClick={() => setActiveSubTab('list')}
           className={`px-1.5 sm:px-4 py-2.5 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 sm:gap-2 min-h-[42px] ${
@@ -230,6 +236,25 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
             </span>
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => {
+            if (onOpenOreasReportModal) {
+              onOpenOreasReportModal();
+            } else {
+              setIsOreasReportModalOpen(true);
+            }
+          }}
+          className="px-1.5 sm:px-4 py-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 active:bg-purple-500/30 text-purple-300 border border-purple-500/30 font-black text-[10px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 sm:gap-2 shadow-md hover:border-purple-400/50 min-h-[42px]"
+          title="Gerar e imprimir relatório de estoque e balanço de padrões OREAS"
+        >
+          <Boxes className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 shrink-0" />
+          <span className="truncate">
+            <span className="inline sm:hidden">Relat. OREAS</span>
+            <span className="hidden sm:inline">Relatório de Estoque OREAS</span>
+          </span>
+        </button>
       </div>
 
       {activeSubTab === 'report' ? (
@@ -814,6 +839,17 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
         </>
       )}
         </>
+      )}
+
+      {/* OREAS Stock Report Modal */}
+      {isOreasReportModalOpen && (
+        <OreasStockReportModal
+          isOpen={isOreasReportModalOpen}
+          onClose={() => setIsOreasReportModalOpen(false)}
+          oreasStockEntries={oreasStockEntries}
+          ars={ars}
+          activeUser={activeUser || { id: 'usr_default', name: 'Usuário Galpão', role: 'Controle de Amostras', createdAt: '' }}
+        />
       )}
     </div>
   );

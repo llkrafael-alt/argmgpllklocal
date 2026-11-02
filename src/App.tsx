@@ -1169,6 +1169,7 @@ export default function App() {
             holes={holes}
             oreasStockEntries={oreasStockEntries}
             photos={qaqcPhotos}
+            activeUser={activeUser}
             onOpenCreateARModal={() => handleOpenCreateARModal()}
             onOpenOreasStockModal={() => setIsOreasStockModalOpen(true)}
             onOpenPdfReportModal={handleOpenPdfReportModal}

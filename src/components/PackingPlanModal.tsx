@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SampleShipmentAR, DrillHole, QAQCSamplePhoto, User } from '../types';
-import { generatePackingPlan, formatDateToPtBR } from '../utils/calculator';
+import {
+  generatePackingPlan,
+  formatDateToPtBR,
+  findVolumeForSample,
+  getQaqcSamplesForVolume,
+} from '../utils/calculator';
 import { AppLogo } from './AppLogo';
 import { QAQCPhotoGallery } from './QAQCPhotoGallery';
-import { X, Printer, Copy, Check, Settings2, Package, Camera } from 'lucide-react';
+import { X, Printer, Copy, Check, Settings2, Package, Camera, Layers } from 'lucide-react';
 
 interface PackingPlanModalProps {
   isOpen: boolean;
@@ -158,25 +163,34 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
   // Format date DD/MM/YYYY
   const formatDateStr = (dateStr: string) => formatDateToPtBR(dateStr);
 
-  // Copy TSV format to clipboard
+  // Copy TSV format to clipboard with volume indication for all QA/QC standards
   const handleCopyTSV = () => {
     if (!plan.isValid) return;
 
     let text = `${hole?.code || ar.drillHoleCode}\n`;
     text += `G MINING\nPROJETO GURUPI\n${ar.arCode}\n\n`;
-    text += `VOLUME\tFROM\tTO\tSEND/VOL\tSAMPLES=\t${plan.totalSamples}\n`;
+    text += `VOLUME\tFROM\tTO\tSEND/VOL\tPADRÕES NO VOLUME\tSAMPLES=\t${plan.totalSamples}\n`;
 
     const maxRows = Math.max(plan.volumes.length, maxQaqcRows > 0 ? maxQaqcRows + 4 : 4);
 
     for (let i = 0; i < maxRows; i++) {
       const vol = plan.volumes[i];
-      const volCol = vol ? `${vol.volumeCode}\t${vol.fromSample}\t${vol.toSample}\t${vol.sendVol}` : `\t\t\t`;
+      let volCol = `\t\t\t\t\t`;
+      if (vol) {
+        const vQaqc = getQaqcSamplesForVolume(vol, qaqcSamples, plan.volumes);
+        const qItems: string[] = [];
+        vQaqc.oreas.forEach((o) => qItems.push(`OREAS ${o.oreasProduct || ''} (${o.code})`.trim()));
+        vQaqc.blk.forEach((b) => qItems.push(`BLK (${b.code})`));
+        vQaqc.dup.forEach((d) => qItems.push(`DUP (${d.code})`));
+        const qStr = qItems.join(', ') || '-';
+        volCol = `${vol.volumeCode}\t${vol.fromSample}\t${vol.toSample}\t${vol.sendVol}\t${qStr}`;
+      }
 
       let rightCol = '';
       if (i === 0) rightCol = `VOLUMES=\t${plan.totalVolumes}`;
       else if (i === 1) rightCol = `WEIGHT=\t${ar.weightKg && ar.weightKg > 0 ? `${ar.weightKg}` : ''}`;
       else if (i === 2) rightCol = `SEND=\t${formatDateStr(ar.shipmentDate)}`;
-      else if (i === 3) rightCol = `OREAS\tBLK\tDUP`;
+      else if (i === 3) rightCol = `OREAS (VOL)\tPADRÃO\tBLK (VOL)\tDUP (VOL)`;
       else {
         const qIndex = i - 4;
         if (qIndex < maxQaqcRows) {
@@ -184,12 +198,17 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
           const blk = blkList[qIndex];
           const dup = dupList[qIndex];
 
-          const oStr = oreas ? `${oreas.code} ${oreas.oreasProduct || oreas.notes || ''}`.trim() : '';
-          const bStr = blk ? blk.code : '';
-          const dStr = dup ? dup.code : '';
+          const oVol = oreas ? findVolumeForSample(oreas.code, plan.volumes)?.volumeCode || '-' : '';
+          const bVol = blk ? findVolumeForSample(blk.code, plan.volumes)?.volumeCode || '-' : '';
+          const dVol = dup ? findVolumeForSample(dup.code, plan.volumes)?.volumeCode || '-' : '';
 
-          if (oStr || bStr || dStr) {
-            rightCol = `${oStr}\t${bStr}\t${dStr}`;
+          const oCode = oreas ? `${oreas.code} [${oVol}]` : '';
+          const oProd = oreas ? (oreas.oreasProduct || oreas.notes || '-') : '';
+          const bStr = blk ? `${blk.code} [${bVol}]` : '';
+          const dStr = dup ? `${dup.code} [${dVol}]` : '';
+
+          if (oCode || bStr || dStr) {
+            rightCol = `${oCode}\t${oProd}\t${bStr}\t${dStr}`;
           }
         }
       }
@@ -328,7 +347,7 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
         </div>
 
         {/* Document Body View Area */}
-        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-950 flex justify-center items-start grow min-h-0">
+        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-950 flex flex-col items-center justify-start grow min-h-0">
           {activeViewTab === 'photos' && activeUser && onUploadPhoto && onDeletePhoto ? (
             <div className="w-full max-w-4xl">
               <QAQCPhotoGallery
@@ -343,157 +362,305 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
               />
             </div>
           ) : (
-            /* Printable Document Sheet Container */
-            <div
-              id="printable-packing-plan"
-              className="w-full max-w-[780px] bg-white text-black p-4 sm:p-5 rounded-xl shadow-2xl font-sans text-xs border border-slate-300 print:max-w-full print:p-2 print:border-none print:shadow-none"
-              style={{ color: '#000000', backgroundColor: '#ffffff' }}
-            >
-            {/* 1. Document Header (Matching requested style with 4 centered lines + Company Logo) */}
-            <div className="border-2 border-black mb-2.5 p-2 bg-white text-black relative flex items-center justify-center min-h-[68px]">
-              {/* Company Logo on Left */}
-              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                <AppLogo size={32} className="shrink-0" />
-                <div className="hidden sm:flex flex-col text-left leading-none font-sans">
-                  <span className="text-[11px] font-black tracking-wider text-black uppercase">MINING</span>
-                  <span className="text-[11px] font-black tracking-wider text-black uppercase">VENTURES</span>
-                </div>
-              </div>
+            <>
+              {/* Interactive Volume Breakdown Ribbon (Screen only, hidden on print) */}
+              {qaqcSamples.length > 0 && plan.isValid && plan.volumes.length > 0 && (
+                <div className="w-full max-w-[840px] mb-4 bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 shadow-lg no-print">
+                  <div className="flex items-center justify-between gap-2 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs font-bold text-white">
+                        Alocação dos Padrões por Volume ({qaqcSamples.length} QA/QC no AR)
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {plan.totalVolumes} {plan.totalVolumes === 1 ? 'Volume' : 'Volumes'} · {plan.totalSamples} Amostras
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {plan.volumes.map((vol) => {
+                      const vQaqc = getQaqcSamplesForVolume(vol, qaqcSamples, plan.volumes);
+                      const hasItems = vQaqc.all.length > 0;
+                      return (
+                        <div
+                          key={vol.volumeCode}
+                          className={`p-2.5 rounded-lg border transition-all ${
+                            hasItems
+                              ? 'bg-slate-800/80 border-cyan-500/30 shadow-xs'
+                              : 'bg-slate-950/40 border-slate-800/80'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-xs mb-1.5 font-mono">
+                            <span className="font-bold text-cyan-300 flex items-center gap-1.5">
+                              <Package className="w-3.5 h-3.5 text-cyan-400" />
+                              {vol.volumeCode}
+                            </span>
+                            <span className="text-slate-400 text-[10.5px]">
+                              {vol.fromSample} → {vol.toSample} ({vol.sendVol} am.)
+                            </span>
+                          </div>
 
-              {/* Centered 4-line Block */}
-              <div className="text-center font-sans font-black text-black uppercase leading-tight py-0.5">
-                <div className="text-xs sm:text-sm font-black tracking-wide">
-                  {(hole?.code || ar.drillHoleCode).toUpperCase()}
+                          {!hasItems ? (
+                            <div className="text-[10px] text-slate-500 italic py-0.5">
+                              Nenhum padrão QA/QC neste volume
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              {vQaqc.oreas.map((o, idx) => (
+                                <div
+                                  key={o.id || o.code || `oreas-${idx}`}
+                                  className="text-[10.5px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 flex items-center justify-between"
+                                >
+                                  <span className="font-bold">OREAS {o.oreasProduct || o.notes || ''}</span>
+                                  <span className="font-mono text-[10px] text-amber-200">{o.code}</span>
+                                </div>
+                              ))}
+                              {vQaqc.blk.map((b, idx) => (
+                                <div
+                                  key={b.id || b.code || `blk-${idx}`}
+                                  className="text-[10.5px] px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200 flex items-center justify-between"
+                                >
+                                  <span className="font-bold">BLK</span>
+                                  <span className="font-mono text-[10px] text-slate-300">{b.code}</span>
+                                </div>
+                              ))}
+                              {vQaqc.dup.map((d, idx) => (
+                                <div
+                                  key={d.id || d.code || `dup-${idx}`}
+                                  className="text-[10.5px] px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-300 flex items-center justify-between"
+                                >
+                                  <span className="font-bold">DUP</span>
+                                  <span className="font-mono text-[10px] text-purple-200">{d.code}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="text-xs sm:text-sm font-black tracking-wide">
-                  G MINING
+              )}
+
+              {/* Printable Document Sheet Container */}
+              <div
+                id="printable-packing-plan"
+                className="w-full max-w-[840px] bg-white text-black p-4 sm:p-5 rounded-xl shadow-2xl font-sans text-xs border border-slate-300 print:max-w-full print:p-2 print:border-none print:shadow-none"
+                style={{ color: '#000000', backgroundColor: '#ffffff' }}
+              >
+                {/* 1. Document Header (Matching requested style with 4 centered lines + Company Logo) */}
+                <div className="border-2 border-black mb-2.5 p-2 bg-white text-black relative flex items-center justify-center min-h-[68px]">
+                  {/* Company Logo on Left */}
+                  <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <AppLogo size={32} className="shrink-0" />
+                    <div className="hidden sm:flex flex-col text-left leading-none font-sans">
+                      <span className="text-[11px] font-black tracking-wider text-black uppercase">MINING</span>
+                      <span className="text-[11px] font-black tracking-wider text-black uppercase">VENTURES</span>
+                    </div>
+                  </div>
+
+                  {/* Centered 4-line Block */}
+                  <div className="text-center font-sans font-black text-black uppercase leading-tight py-0.5">
+                    <div className="text-xs sm:text-sm font-black tracking-wide">
+                      {(hole?.code || ar.drillHoleCode).toUpperCase()}
+                    </div>
+                    <div className="text-xs sm:text-sm font-black tracking-wide">
+                      G MINING
+                    </div>
+                    <div className="text-xs sm:text-sm font-black tracking-wide">
+                      PROJETO GURUPI
+                    </div>
+                    <div className="text-xs sm:text-sm font-black tracking-wide">
+                      {ar.arCode}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xs sm:text-sm font-black tracking-wide">
-                  PROJETO GURUPI
-                </div>
-                <div className="text-xs sm:text-sm font-black tracking-wide">
-                  {ar.arCode}
-                </div>
-              </div>
-            </div>
 
-            {/* 2. Main Layout: Volumes Table (Left) + Summary & QA/QC (Right) - ALWAYS 12-COL SIDE-BY-SIDE */}
-            <div className="grid grid-cols-12 gap-2.5 items-start">
-              {/* Left Side: Volumes Table (7 columns out of 12) */}
-              <div className="col-span-7">
-                <table className="w-full border-collapse border border-black text-center text-xs bg-white">
-                  <thead>
-                    <tr className="bg-slate-200 border-b border-black font-black uppercase text-[9px] text-black">
-                      <th className="border border-black py-0.5 px-1">VOLUME</th>
-                      <th className="border border-black py-0.5 px-1">FROM</th>
-                      <th className="border border-black py-0.5 px-1">TO</th>
-                      <th className="border border-black py-0.5 px-1">SEND/VOL</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {plan.volumes.map((vol) => (
-                      <tr key={vol.volumeCode} className="border-b border-black font-mono text-[10px] text-black">
-                        <td className="border border-black py-0.5 px-1 font-bold bg-slate-50 text-black">{vol.volumeCode}</td>
-                        <td className="border border-black py-0.5 px-1 font-bold text-black">{vol.fromSample}</td>
-                        <td className="border border-black py-0.5 px-1 font-bold text-black">{vol.toSample}</td>
-                        <td className="border border-black py-0.5 px-1 font-bold text-black">{vol.sendVol}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                {/* 2. Main Layout: Volumes Table (Left) + Summary & QA/QC (Right) - ALWAYS 12-COL SIDE-BY-SIDE */}
+                <div className="grid grid-cols-12 gap-2.5 items-start">
+                  {/* Left Side: Volumes Table (7 columns out of 12) */}
+                  <div className="col-span-7">
+                    <table className="w-full border-collapse border border-black text-center text-xs bg-white">
+                      <thead>
+                        <tr className="bg-slate-200 border-b border-black font-black uppercase text-[9px] text-black">
+                          <th className="border border-black py-0.5 px-1 w-[15%]">VOLUME</th>
+                          <th className="border border-black py-0.5 px-1 w-[16%]">FROM</th>
+                          <th className="border border-black py-0.5 px-1 w-[16%]">TO</th>
+                          <th className="border border-black py-0.5 px-1 w-[13%]">SEND/VOL</th>
+                          <th className="border border-black py-0.5 px-1 w-[40%] bg-slate-100">PADRÕES (QA/QC)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {plan.volumes.map((vol) => {
+                          const vQaqc = getQaqcSamplesForVolume(vol, qaqcSamples, plan.volumes);
+                          return (
+                            <tr key={vol.volumeCode} className="border-b border-black font-mono text-[10px] text-black">
+                              <td className="border border-black py-0.5 px-1 font-bold bg-slate-50 text-black">{vol.volumeCode}</td>
+                              <td className="border border-black py-0.5 px-1 font-bold text-black">{vol.fromSample}</td>
+                              <td className="border border-black py-0.5 px-1 font-bold text-black">{vol.toSample}</td>
+                              <td className="border border-black py-0.5 px-1 font-bold text-black">{vol.sendVol}</td>
+                              <td className="border border-black py-0.5 px-1 text-left text-[8.5px] font-sans">
+                                {vQaqc.all.length === 0 ? (
+                                  <span className="text-slate-400 italic font-mono">-</span>
+                                ) : (
+                                  <div className="flex flex-wrap gap-1 items-center">
+                                    {vQaqc.oreas.map((o, idx) => (
+                                      <span
+                                        key={o.id || o.code || `tbl-oreas-${idx}`}
+                                        className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded font-bold bg-amber-100 text-amber-950 border border-amber-300"
+                                      >
+                                        OREAS {o.oreasProduct || ''} ({o.code})
+                                      </span>
+                                    ))}
+                                    {vQaqc.blk.map((b, idx) => (
+                                      <span
+                                        key={b.id || b.code || `tbl-blk-${idx}`}
+                                        className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded font-bold bg-slate-100 text-slate-900 border border-slate-300"
+                                      >
+                                        BLK ({b.code})
+                                      </span>
+                                    ))}
+                                    {vQaqc.dup.map((d, idx) => (
+                                      <span
+                                        key={d.id || d.code || `tbl-dup-${idx}`}
+                                        className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded font-bold bg-purple-100 text-purple-950 border border-purple-300"
+                                      >
+                                        DUP ({d.code})
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
 
-              {/* Right Side: Summary Block & QA/QC Samples (5 columns out of 12) */}
-              <div className="col-span-5 flex flex-col gap-2">
-                {/* Summary Table */}
-                <table className="w-full border-collapse border border-black text-xs bg-white">
-                  <tbody>
-                    <tr className="border-b border-black text-black">
-                      <td className="border border-black py-0.5 px-2 font-bold bg-slate-100 uppercase text-[9px] w-1/2 text-black">
-                        SAMPLES=
-                      </td>
-                      <td className="border border-black py-0.5 px-2 font-mono font-bold text-[11px] text-black">
-                        {plan.totalSamples}
-                      </td>
-                    </tr>
-                    <tr className="border-b border-black text-black">
-                      <td className="border border-black py-0.5 px-2 font-bold bg-slate-100 uppercase text-[9px] text-black">
-                        VOLUMES=
-                      </td>
-                      <td className="border border-black py-0.5 px-2 font-mono font-bold text-[11px] text-black">
-                        {plan.totalVolumes}
-                      </td>
-                    </tr>
-                    <tr className="border-b border-black text-black">
-                      <td className="border border-black py-0.5 px-2 font-bold bg-slate-100 uppercase text-[9px] text-black">
-                        WEIGHT=
-                      </td>
-                      <td className="border border-black py-0.5 px-2 font-mono font-bold text-[11px] text-black">
-                        {ar.weightKg && ar.weightKg > 0 ? ar.weightKg : ''}
-                      </td>
-                    </tr>
-                    <tr className="text-black">
-                      <td className="border border-black py-0.5 px-2 font-bold bg-slate-100 uppercase text-[9px] text-black">
-                        SEND=
-                      </td>
-                      <td className="border border-black py-0.5 px-2 font-mono font-bold text-[11px] text-black">
-                        {formatDateStr(ar.shipmentDate)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                  {/* Right Side: Summary Block & QA/QC Samples (5 columns out of 12) */}
+                  <div className="col-span-5 flex flex-col gap-2">
+                    {/* Summary Table */}
+                    <table className="w-full border-collapse border border-black text-xs bg-white">
+                      <tbody>
+                        <tr className="border-b border-black text-black">
+                          <td className="border border-black py-0.5 px-2 font-bold bg-slate-100 uppercase text-[9px] w-1/2 text-black">
+                            SAMPLES=
+                          </td>
+                          <td className="border border-black py-0.5 px-2 font-mono font-bold text-[11px] text-black">
+                            {plan.totalSamples}
+                          </td>
+                        </tr>
+                        <tr className="border-b border-black text-black">
+                          <td className="border border-black py-0.5 px-2 font-bold bg-slate-100 uppercase text-[9px] text-black">
+                            VOLUMES=
+                          </td>
+                          <td className="border border-black py-0.5 px-2 font-mono font-bold text-[11px] text-black">
+                            {plan.totalVolumes}
+                          </td>
+                        </tr>
+                        <tr className="border-b border-black text-black">
+                          <td className="border border-black py-0.5 px-2 font-bold bg-slate-100 uppercase text-[9px] text-black">
+                            WEIGHT=
+                          </td>
+                          <td className="border border-black py-0.5 px-2 font-mono font-bold text-[11px] text-black">
+                            {ar.weightKg && ar.weightKg > 0 ? ar.weightKg : ''}
+                          </td>
+                        </tr>
+                        <tr className="text-black">
+                          <td className="border border-black py-0.5 px-2 font-bold bg-slate-100 uppercase text-[9px] text-black">
+                            SEND=
+                          </td>
+                          <td className="border border-black py-0.5 px-2 font-mono font-bold text-[11px] text-black">
+                            {formatDateStr(ar.shipmentDate)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
 
-                {/* QA/QC Standards Table */}
-                <table className="w-full border-collapse border border-black text-center text-xs bg-white">
-                  <thead>
-                    <tr className="bg-slate-200 border-b border-black font-black uppercase text-[9px] text-black">
-                      <th className="border border-black py-0.5 px-0.5" colSpan={2}>
-                        OREAS
-                      </th>
-                      <th className="border border-black py-0.5 px-0.5">BLK</th>
-                      <th className="border border-black py-0.5 px-0.5">DUP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {maxQaqcRows === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="border border-black py-1.5 px-2 text-center text-slate-500 italic text-[9.5px]">
-                          Nenhum padrão QA/QC inserido neste AR
-                        </td>
-                      </tr>
-                    ) : (
-                      Array.from({ length: maxQaqcRows }).map((_, idx) => {
-                        const oreas = oreasList[idx];
-                        const blk = blkList[idx];
-                        const dup = dupList[idx];
-
-                        return (
-                          <tr key={idx} className="border-b border-black font-mono text-[9.5px] text-black">
-                            {/* OREAS Code */}
-                            <td className="border border-black py-0.5 px-0.5 font-bold w-1/4 text-black">
-                              {oreas ? oreas.code : ''}
-                            </td>
-                            {/* OREAS Lot/Product */}
-                            <td className="border border-black py-0.5 px-0.5 font-bold text-black w-1/4">
-                              {oreas ? oreas.oreasProduct || oreas.notes || '' : ''}
-                            </td>
-                            {/* BLK Code */}
-                            <td className="border border-black py-0.5 px-0.5 font-bold w-1/4 text-black">
-                              {blk ? blk.code : ''}
-                            </td>
-                            {/* DUP Code */}
-                            <td className="border border-black py-0.5 px-0.5 font-bold w-1/4 text-black">
-                              {dup ? dup.code : ''}
+                    {/* QA/QC Standards Table with Volume Indication for OREAS, BLK, DUP */}
+                    <table className="w-full border-collapse border border-black text-center text-xs bg-white">
+                      <thead>
+                        <tr className="bg-slate-200 border-b border-black font-black uppercase text-[9px] text-black">
+                          <th className="border border-black py-0.5 px-0.5" colSpan={2}>
+                            OREAS
+                          </th>
+                          <th className="border border-black py-0.5 px-0.5">BLK</th>
+                          <th className="border border-black py-0.5 px-0.5">DUP</th>
+                        </tr>
+                        <tr className="bg-slate-100 border-b border-black font-black uppercase text-[7.5px] text-black tracking-tight">
+                          <th className="border border-black py-0.5 px-0.5">CÓDIGO (VOL)</th>
+                          <th className="border border-black py-0.5 px-0.5">PADRÃO</th>
+                          <th className="border border-black py-0.5 px-0.5">CÓDIGO (VOL)</th>
+                          <th className="border border-black py-0.5 px-0.5">CÓDIGO (VOL)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {maxQaqcRows === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="border border-black py-1.5 px-2 text-center text-slate-500 italic text-[9.5px]">
+                              Nenhum padrão QA/QC inserido neste AR
                             </td>
                           </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                        ) : (
+                          Array.from({ length: maxQaqcRows }).map((_, idx) => {
+                            const oreas = oreasList[idx];
+                            const blk = blkList[idx];
+                            const dup = dupList[idx];
+
+                            const oreasVol = oreas ? findVolumeForSample(oreas.code, plan.volumes) : null;
+                            const blkVol = blk ? findVolumeForSample(blk.code, plan.volumes) : null;
+                            const dupVol = dup ? findVolumeForSample(dup.code, plan.volumes) : null;
+
+                            return (
+                              <tr key={idx} className="border-b border-black font-mono text-[9.5px] text-black">
+                                {/* OREAS Code & Volume */}
+                                <td className="border border-black py-0.5 px-0.5 font-bold w-1/4 text-black text-center">
+                                  {oreas ? (
+                                    <div className="flex flex-col items-center justify-center leading-tight py-0.5">
+                                      <span className="font-bold text-[9.5px]">{oreas.code}</span>
+                                      <span className="text-[7.5px] font-mono font-black text-slate-900 bg-amber-100/90 border border-black/40 px-1 py-0.2 rounded mt-0.5">
+                                        {oreasVol ? oreasVol.volumeCode : 'S/ VOL'}
+                                      </span>
+                                    </div>
+                                  ) : ''}
+                                </td>
+                                {/* OREAS Lot/Product */}
+                                <td className="border border-black py-0.5 px-0.5 font-bold text-black w-1/4 text-center">
+                                  {oreas ? oreas.oreasProduct || oreas.notes || '-' : ''}
+                                </td>
+                                {/* BLK Code & Volume */}
+                                <td className="border border-black py-0.5 px-0.5 font-bold w-1/4 text-black text-center">
+                                  {blk ? (
+                                    <div className="flex flex-col items-center justify-center leading-tight py-0.5">
+                                      <span className="font-bold text-[9.5px]">{blk.code}</span>
+                                      <span className="text-[7.5px] font-mono font-black text-slate-900 bg-slate-100 border border-black/40 px-1 py-0.2 rounded mt-0.5">
+                                        {blkVol ? blkVol.volumeCode : 'S/ VOL'}
+                                      </span>
+                                    </div>
+                                  ) : ''}
+                                </td>
+                                {/* DUP Code & Volume */}
+                                <td className="border border-black py-0.5 px-0.5 font-bold w-1/4 text-black text-center">
+                                  {dup ? (
+                                    <div className="flex flex-col items-center justify-center leading-tight py-0.5">
+                                      <span className="font-bold text-[9.5px]">{dup.code}</span>
+                                      <span className="text-[7.5px] font-mono font-black text-slate-900 bg-purple-100/90 border border-black/40 px-1 py-0.2 rounded mt-0.5">
+                                        {dupVol ? dupVol.volumeCode : 'S/ VOL'}
+                                      </span>
+                                    </div>
+                                  ) : ''}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
           )}
         </div>
       </div>

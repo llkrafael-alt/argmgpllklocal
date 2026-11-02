@@ -694,7 +694,7 @@ export function findVolumeForSample(
 /**
  * Categorizes and retrieves all QA/QC samples (OREAS, BLK, DUP) belonging to a specific volume.
  */
-export function getQaqcSamplesForVolume<T extends { id?: string; code?: string; type?: string; oreasProduct?: string; notes?: string }>(
+export function getQaqcSamplesForVolume<T extends { id?: string; code?: string; type?: string; oreasProduct?: string; duplicateMeter?: string; notes?: string }>(
   vol: PackingVolume,
   qaqcSamples: T[],
   volumes: PackingVolume[]

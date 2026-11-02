@@ -24,6 +24,12 @@ interface SingleRow {
   code: string;
 }
 
+interface DupRow {
+  id: string;
+  code: string;
+  meter: string;
+}
+
 interface QaqcGridInputProps {
   initialSamples: QaQcSample[];
   onChange: (samples: QaQcSample[]) => void;
@@ -46,10 +52,16 @@ const createBlankSingleRow = (): SingleRow => ({
   code: '',
 });
 
+const createBlankDupRow = (): DupRow => ({
+  id: generateId(),
+  code: '',
+  meter: '',
+});
+
 const buildInitialRows = (samples: QaQcSample[]) => {
   const existingOreas: OreasRow[] = [];
   const existingBlk: SingleRow[] = [];
-  const existingDup: SingleRow[] = [];
+  const existingDup: DupRow[] = [];
 
   (samples || []).forEach((s) => {
     const typeUpper = (s.type || '').trim().toUpperCase();
@@ -69,15 +81,18 @@ const buildInitialRows = (samples: QaQcSample[]) => {
         code: s.code || '',
       });
     } else if (typeUpper.includes('DUP') || typeUpper.includes('DUPLICATA')) {
+      const parsedMeter = s.duplicateMeter || (s.notes && !s.notes.startsWith('Lote') && !s.notes.includes('250c') ? s.notes.replace(/^metro:\s*/i, '') : '');
       existingDup.push({
         id: s.id || generateId(),
         code: s.code || '',
+        meter: parsedMeter || '',
       });
     } else {
       // Fallback for other standard types -> place in DUP column
       existingDup.push({
         id: s.id || generateId(),
         code: s.code || '',
+        meter: s.duplicateMeter || '',
       });
     }
   });
@@ -90,7 +105,7 @@ const buildInitialRows = (samples: QaQcSample[]) => {
     existingBlk.push(createBlankSingleRow());
   }
   while (existingDup.length < 10) {
-    existingDup.push(createBlankSingleRow());
+    existingDup.push(createBlankDupRow());
   }
 
   return { oreas: existingOreas, blk: existingBlk, dup: existingDup };
@@ -107,7 +122,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
   // 3 independent row states for each column, initialized with 10 rows each
   const [oreasRows, setOreasRows] = useState<OreasRow[]>(() => buildInitialRows(initialSamples).oreas);
   const [blkRows, setBlkRows] = useState<SingleRow[]>(() => buildInitialRows(initialSamples).blk);
-  const [dupRows, setDupRows] = useState<SingleRow[]>(() => buildInitialRows(initialSamples).dup);
+  const [dupRows, setDupRows] = useState<DupRow[]>(() => buildInitialRows(initialSamples).dup);
 
   // Tab view selection (All 3 columns or focused single column on mobile/tablet)
   const [activeTab, setActiveTab] = useState<'all' | 'oreas' | 'blk' | 'dup'>('all');
@@ -117,9 +132,10 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
   const oreasLotRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const blkCodeRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const dupCodeRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+  const dupMeterRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
   // Pending focus after adding row
-  const pendingFocusRef = useRef<{ column: 'oreas' | 'blk' | 'dup'; index: number; field?: 'code' | 'lot' } | null>(null);
+  const pendingFocusRef = useRef<{ column: 'oreas' | 'blk' | 'dup'; index: number; field?: 'code' | 'lot' | 'meter' } | null>(null);
 
   // Track last focused Oreas row index for quick-chip applying
   const [lastFocusedOreasIndex, setLastFocusedOreasIndex] = useState<number | null>(null);
@@ -128,13 +144,13 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
   const prevArIdRef = useRef(currentArId);
   const prevResetKeyRef = useRef(resetKey);
   const prevSamplesSignatureRef = useRef<string>(
-    (initialSamples || []).map((s) => `${s.type}:${s.code}:${s.oreasProduct || ''}`).join('|')
+    (initialSamples || []).map((s) => `${s.type}:${s.code}:${s.oreasProduct || ''}:${s.duplicateMeter || ''}`).join('|')
   );
 
   useEffect(() => {
     const arIdChanged = prevArIdRef.current !== currentArId;
     const resetKeyChanged = resetKey !== undefined && prevResetKeyRef.current !== resetKey;
-    const currentSignature = (initialSamples || []).map((s) => `${s.type}:${s.code}:${s.oreasProduct || ''}`).join('|');
+    const currentSignature = (initialSamples || []).map((s) => `${s.type}:${s.code}:${s.oreasProduct || ''}:${s.duplicateMeter || ''}`).join('|');
     const signatureChanged = prevSamplesSignatureRef.current !== currentSignature;
 
     // Only re-sync from props if arId/resetKey changed, or if initialSamples was populated or cleared from outside
@@ -169,7 +185,11 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
       } else if (column === 'blk') {
         blkCodeRefs.current[index]?.focus();
       } else if (column === 'dup') {
-        dupCodeRefs.current[index]?.focus();
+        if (field === 'meter') {
+          dupMeterRefs.current[index]?.focus();
+        } else {
+          dupCodeRefs.current[index]?.focus();
+        }
       }
     });
   }, [oreasRows, blkRows, dupRows]);
@@ -178,7 +198,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
   const emitCleanedSamples = (
     currentOreas: OreasRow[],
     currentBlk: SingleRow[],
-    currentDup: SingleRow[]
+    currentDup: DupRow[]
   ) => {
     const cleaned: QaQcSample[] = [];
 
@@ -214,11 +234,14 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
     // DUP: only include rows with non-empty code
     currentDup.forEach((r) => {
       const code = r.code.trim().toUpperCase();
+      const meter = r.meter.trim();
       if (code !== '') {
         cleaned.push({
           id: r.id,
           type: 'DUP',
           code,
+          duplicateMeter: meter || undefined,
+          notes: meter ? `Metro: ${meter}` : undefined,
           quantity: 1,
         });
       }
@@ -465,61 +488,67 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
   };
 
   // --- DUP Handlers ---
-  const handleDupChange = (index: number, value: string) => {
+  const handleDupChange = (index: number, field: 'code' | 'meter', value: string) => {
     const updated = [...dupRows];
     updated[index] = {
       ...updated[index],
-      code: value.toUpperCase(),
+      [field]: field === 'code' ? value.toUpperCase() : value,
     };
     setDupRows(updated);
     emitCleanedSamples(oreasRows, blkRows, updated);
   };
 
-  const handleAddDupRow = (focusIndex?: number) => {
-    const updated = [...dupRows, createBlankSingleRow()];
+  const handleAddDupRow = (focusIndex?: number, field: 'code' | 'meter' = 'code') => {
+    const updated = [...dupRows, createBlankDupRow()];
     setDupRows(updated);
     const newIdx = focusIndex !== undefined ? focusIndex : updated.length - 1;
-    pendingFocusRef.current = { column: 'dup', index: newIdx };
+    pendingFocusRef.current = { column: 'dup', index: newIdx, field };
   };
 
   const handleAddMultipleDupRows = (count: number = 5) => {
-    const newRows: SingleRow[] = Array.from({ length: count }, () => createBlankSingleRow());
+    const newRows: DupRow[] = Array.from({ length: count }, () => createBlankDupRow());
     const updated = [...dupRows, ...newRows];
     setDupRows(updated);
   };
 
   const handleClearEmptyDupRows = () => {
-    const filled = dupRows.filter((r) => r.code.trim() !== '');
+    const filled = dupRows.filter((r) => r.code.trim() !== '' || r.meter.trim() !== '');
     while (filled.length < 10) {
-      filled.push(createBlankSingleRow());
+      filled.push(createBlankDupRow());
     }
     setDupRows(filled);
   };
 
   const handleDeleteDupRow = (index: number) => {
-    let updated: SingleRow[];
+    let updated: DupRow[];
     if (dupRows.length > 10) {
       updated = dupRows.filter((_, i) => i !== index);
     } else {
       updated = [...dupRows];
-      updated[index] = createBlankSingleRow();
+      updated[index] = createBlankDupRow();
     }
     setDupRows(updated);
     emitCleanedSamples(oreasRows, blkRows, updated);
   };
 
-  const handleDupKeyDown = (e: React.KeyboardEvent, index: number) => {
+  const handleDupKeyDown = (e: React.KeyboardEvent, index: number, field: 'code' | 'meter') => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (index === dupRows.length - 1) {
-        handleAddDupRow(index + 1);
+      if (field === 'code') {
+        // Move focus to meter in the same row
+        dupMeterRefs.current[index]?.focus();
       } else {
-        dupCodeRefs.current[index + 1]?.focus();
+        // In meter: move to code of next row
+        if (index === dupRows.length - 1) {
+          handleAddDupRow(index + 1, 'code');
+        } else {
+          dupCodeRefs.current[index + 1]?.focus();
+        }
       }
     }
   };
 
-  const handleDupPaste = (e: React.ClipboardEvent<HTMLInputElement>, startIndex: number) => {
+  const handleDupPaste = (e: React.ClipboardEvent<HTMLInputElement>, startIndex: number, field: 'code' | 'meter') => {
     const text = e.clipboardData.getData('text');
     if (!text || (!text.includes('\n') && !text.includes('\t'))) return;
 
@@ -535,13 +564,30 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
     lines.forEach((line, lineOffset) => {
       const targetIndex = startIndex + lineOffset;
       while (targetIndex >= updated.length) {
-        updated.push(createBlankSingleRow());
+        updated.push(createBlankDupRow());
       }
-      const codeVal = line.split('\t')[0].trim().toUpperCase();
-      updated[targetIndex] = {
-        ...updated[targetIndex],
-        code: codeVal,
-      };
+
+      if (line.includes('\t') || line.includes(';') || line.includes(',')) {
+        const delimiter = line.includes('\t') ? '\t' : line.includes(';') ? ';' : ',';
+        const parts = line.split(delimiter).map((p) => p.trim());
+        updated[targetIndex] = {
+          ...updated[targetIndex],
+          code: (parts[0] || '').toUpperCase(),
+          meter: parts[1] || updated[targetIndex].meter,
+        };
+      } else {
+        if (field === 'code') {
+          updated[targetIndex] = {
+            ...updated[targetIndex],
+            code: line.toUpperCase(),
+          };
+        } else {
+          updated[targetIndex] = {
+            ...updated[targetIndex],
+            meter: line,
+          };
+        }
+      }
     });
 
     setDupRows(updated);
@@ -950,7 +996,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
   const renderDupColumn = (isFullWidth = false) => (
     <div
       className={`flex flex-col rounded-2xl bg-slate-900 border border-cyan-500/40 overflow-hidden shadow-md transition-all ${
-        isFullWidth ? 'w-full' : 'flex-1 min-w-[280px]'
+        isFullWidth ? 'w-full' : 'flex-[1.3] min-w-[340px]'
       }`}
     >
       {/* Column Header */}
@@ -967,7 +1013,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
               </span>
             </div>
             <span className="text-xs text-cyan-300/80 font-medium">
-              Duplicatas de Campo / Polpa
+              Duplicatas com Metro de Origem
             </span>
           </div>
         </div>
@@ -976,7 +1022,8 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
       {/* Subheaders */}
       <div className="flex items-center gap-2 px-3 py-2 bg-slate-950/90 border-b border-slate-800 text-xs font-black uppercase text-slate-300">
         <div className="w-8 sm:w-9 text-center font-mono shrink-0">#</div>
-        <div className="flex-1 min-w-[180px]">Cód. Amostra (Duplicata)</div>
+        <div className="flex-1 min-w-[120px]">Cód. Amostra</div>
+        <div className="flex-1 min-w-[120px]">Metro Origem (ex: 45.0m)</div>
         <div className="w-8 text-center shrink-0"></div>
       </div>
 
@@ -998,7 +1045,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
               </div>
 
               {/* Sample Code Input */}
-              <div className="flex-1 min-w-[180px]">
+              <div className="flex-1 min-w-[120px]">
                 <input
                   ref={(el) => {
                     dupCodeRefs.current[idx] = el;
@@ -1006,9 +1053,9 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
                   type="text"
                   placeholder="Ex: R09420"
                   value={row.code}
-                  onChange={(e) => handleDupChange(idx, e.target.value)}
-                  onKeyDown={(e) => handleDupKeyDown(e, idx)}
-                  onPaste={(e) => handleDupPaste(e, idx)}
+                  onChange={(e) => handleDupChange(idx, 'code', e.target.value)}
+                  onKeyDown={(e) => handleDupKeyDown(e, idx, 'code')}
+                  onPaste={(e) => handleDupPaste(e, idx, 'code')}
                   className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
                     isFilled
                       ? 'border-cyan-500/70 bg-cyan-950/40 text-cyan-100 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30'
@@ -1017,9 +1064,30 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
                 />
               </div>
 
+              {/* Duplicate Meter Input */}
+              <div className="flex-1 min-w-[120px]">
+                <input
+                  ref={(el) => {
+                    dupMeterRefs.current[idx] = el;
+                  }}
+                  type="text"
+                  placeholder="Ex: 45.0m"
+                  value={row.meter}
+                  onChange={(e) => handleDupChange(idx, 'meter', e.target.value)}
+                  onKeyDown={(e) => handleDupKeyDown(e, idx, 'meter')}
+                  onPaste={(e) => handleDupPaste(e, idx, 'meter')}
+                  className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
+                    row.meter.trim()
+                      ? 'border-cyan-500/60 bg-cyan-950/30 text-cyan-200 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30'
+                      : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500'
+                  }`}
+                  title="Metro de onde a duplicata foi coletada (ex: 45m, 12.5m)"
+                />
+              </div>
+
               {/* Delete / Clear button */}
               <div className="w-8 shrink-0 flex justify-center">
-                {row.code ? (
+                {row.code || row.meter ? (
                   <button
                     type="button"
                     onClick={() => handleDeleteDupRow(idx)}

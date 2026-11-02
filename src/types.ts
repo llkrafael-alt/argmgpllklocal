@@ -76,6 +76,7 @@ export interface QaQcSample {
   type: string;  // e.g., "OREAS", "BLK", "Gesso", "DUP", "Outro"
   code: string;  // Código de amostragem no envio (e.g., "TST00010", "R11530")
   oreasProduct?: string; // Nome/Produto do OREAS (e.g., "250c", "626", "251c")
+  duplicateMeter?: string; // Informação de qual metro a duplicata pertence (e.g., "45.0m", "12.5m")
   notes?: string; // Observação / Lote
   quantity?: number; // Qtd utilizada neste envio/AR (default 1)
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DrillHole, User, SampleShipmentAR, SampleRange } from '../types';
 import { QaqcTableGrid } from './QaqcTableGrid';
 import { parseSampleRange, parseSampleRanges, getARVolumeCount, formatDateToPtBR, getNormalizedSampleRanges } from '../utils/calculator';
+import { saveARToDb } from '../services/firebase';
 import {
   X,
   PlusCircle,
@@ -91,6 +92,23 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
       (hole.code && ar.drillHoleCode?.trim().toUpperCase() === hole.code.trim().toUpperCase())
   );
   const totalShippedSamples = holeARs.reduce((acc, ar) => acc + (ar.sampleCount || 0), 0);
+
+  const handleUpdateDuplicateMeter = async (arId: string, sampleIdOrCode: string, meter: string) => {
+    const targetAR = ars.find((a) => a.id === arId);
+    if (!targetAR) return;
+    const cleanMeter = meter.trim();
+    const updatedQaqc = (targetAR.qaqcSamples || []).map((s) => {
+      if (s.id === sampleIdOrCode || s.code === sampleIdOrCode) {
+        return {
+          ...s,
+          duplicateMeter: cleanMeter || undefined,
+          notes: cleanMeter ? `Metro: ${cleanMeter}` : s.notes,
+        };
+      }
+      return s;
+    });
+    await saveARToDb({ ...targetAR, qaqcSamples: updatedQaqc });
+  };
 
   // Multi-range sample plan calculation
   const multiCheck = parseSampleRanges(sampleRanges);
@@ -498,7 +516,11 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
                         <td className="p-2.5 text-center font-mono text-slate-300">{getARVolumeCount(ar)} vol</td>
                         <td className="p-2.5 text-center font-mono text-purple-300">{ar.weightKg ? `${ar.weightKg} kg` : '-'}</td>
                         <td className="p-2.5">
-                          <QaqcTableGrid samples={ar.qaqcSamples || []} />
+                          <QaqcTableGrid
+                            samples={ar.qaqcSamples || []}
+                            arId={ar.id}
+                            onUpdateDuplicateMeter={handleUpdateDuplicateMeter}
+                          />
                         </td>
                         <td className="p-2.5 font-mono text-slate-400">{ar.shipmentDate ? formatDateToPtBR(ar.shipmentDate) : '-'}</td>
                         <td className="p-2.5 text-right whitespace-nowrap">

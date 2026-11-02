@@ -689,6 +689,57 @@ export default function App() {
     [triggerToast]
   );
 
+  // Direct inline update of duplicate meter in AR QA/QC
+  const handleUpdateARDuplicateMeter = useCallback(
+    async (arId: string, sampleIdOrCode: string, meter: string) => {
+      try {
+        let arCode = '';
+        let sampleCode = '';
+        const cleanMeter = meter.trim();
+        setARs((prevARs) => {
+          const targetAR = prevARs.find((a) => a.id === arId);
+          if (!targetAR) return prevARs;
+          arCode = targetAR.arCode;
+
+          const updatedQaqc = (targetAR.qaqcSamples || []).map((s) => {
+            if (s.id === sampleIdOrCode || s.code === sampleIdOrCode) {
+              sampleCode = s.code;
+              return {
+                ...s,
+                duplicateMeter: cleanMeter || undefined,
+                notes: cleanMeter ? `Metro: ${cleanMeter}` : s.notes,
+              };
+            }
+            return s;
+          });
+
+          const updatedAR: SampleShipmentAR = {
+            ...targetAR,
+            qaqcSamples: updatedQaqc,
+          };
+
+          setPackingPlanAR((current) => (current && current.id === arId ? updatedAR : current));
+
+          saveARToDb(updatedAR).catch((e) =>
+            console.error('Erro ao atualizar metro da duplicata no banco:', e)
+          );
+
+          return prevARs.map((a) => (a.id === arId ? updatedAR : a));
+        });
+
+        triggerToast(
+          cleanMeter
+            ? `Metro da duplicata ${sampleCode || ''} (AR ${arCode}) atualizado para ${cleanMeter}!`
+            : `Metro da duplicata ${sampleCode || ''} removido.`
+        );
+      } catch (err) {
+        console.error('Erro ao atualizar metro da duplicata:', err);
+        triggerToast('Erro ao atualizar metro da duplicata.');
+      }
+    },
+    [triggerToast]
+  );
+
   const handleDeleteAR = async (arId: string) => {
     try {
       const targetAR = ars.find((a) => a.id === arId);
@@ -1176,6 +1227,7 @@ export default function App() {
             onEditAR={handleOpenEditARModal}
             onUpdateARWeight={handleUpdateARWeight}
             onUpdateARShipmentDate={handleUpdateARShipmentDate}
+            onUpdateDuplicateMeter={handleUpdateARDuplicateMeter}
             onDeleteAR={handleDeleteAR}
             onOpenHoleDetailByCode={handleOpenHoleDetailByCode}
             onOpenPackingPlan={handleOpenPackingPlan}

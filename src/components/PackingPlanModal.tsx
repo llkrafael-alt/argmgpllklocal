@@ -181,7 +181,7 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
         const qItems: string[] = [];
         vQaqc.oreas.forEach((o) => qItems.push(`OREAS ${o.oreasProduct || ''} (${o.code})`.trim()));
         vQaqc.blk.forEach((b) => qItems.push(`BLK (${b.code})`));
-        vQaqc.dup.forEach((d) => qItems.push(`DUP (${d.code})`));
+        vQaqc.dup.forEach((d) => qItems.push(`DUP (${d.code}${d.duplicateMeter ? ` - ${d.duplicateMeter}` : ''})`));
         const qStr = qItems.join(', ') || '-';
         volCol = `${vol.volumeCode}\t${vol.fromSample}\t${vol.toSample}\t${vol.sendVol}\t${qStr}`;
       }
@@ -190,7 +190,7 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
       if (i === 0) rightCol = `VOLUMES=\t${plan.totalVolumes}`;
       else if (i === 1) rightCol = `WEIGHT=\t${ar.weightKg && ar.weightKg > 0 ? `${ar.weightKg}` : ''}`;
       else if (i === 2) rightCol = `SEND=\t${formatDateStr(ar.shipmentDate)}`;
-      else if (i === 3) rightCol = `OREAS (VOL)\tPADRÃO\tBLK (VOL)\tDUP (VOL)`;
+      else if (i === 3) rightCol = `OREAS (VOL)\tPADRÃO\tBLK (VOL)\tDUP (VOL) [METRO]`;
       else {
         const qIndex = i - 4;
         if (qIndex < maxQaqcRows) {
@@ -205,7 +205,8 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
           const oCode = oreas ? `${oreas.code} [${oVol}]` : '';
           const oProd = oreas ? (oreas.oreasProduct || oreas.notes || '-') : '';
           const bStr = blk ? `${blk.code} [${bVol}]` : '';
-          const dStr = dup ? `${dup.code} [${dVol}]` : '';
+          const dMeter = dup?.duplicateMeter ? ` [${dup.duplicateMeter}]` : '';
+          const dStr = dup ? `${dup.code} [${dVol}]${dMeter}` : '';
 
           if (oCode || bStr || dStr) {
             rightCol = `${oCode}\t${oProd}\t${bStr}\t${dStr}`;
@@ -525,7 +526,7 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
                                         key={d.id || d.code || `tbl-dup-${idx}`}
                                         className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded font-bold bg-purple-100 text-purple-950 border border-purple-300"
                                       >
-                                        DUP ({d.code})
+                                        DUP ({d.code}{d.duplicateMeter ? ` - ${d.duplicateMeter.toLowerCase().includes('m') ? d.duplicateMeter : `${d.duplicateMeter}m`}` : ''})
                                       </span>
                                     ))}
                                   </div>
@@ -592,7 +593,7 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
                           <th className="border border-black py-0.5 px-0.5">CÓDIGO (VOL)</th>
                           <th className="border border-black py-0.5 px-0.5">PADRÃO</th>
                           <th className="border border-black py-0.5 px-0.5">CÓDIGO (VOL)</th>
-                          <th className="border border-black py-0.5 px-0.5">CÓDIGO (VOL)</th>
+                          <th className="border border-black py-0.5 px-0.5">CÓDIGO (VOL) • METRO</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -640,11 +641,16 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
                                     </div>
                                   ) : ''}
                                 </td>
-                                {/* DUP Code & Volume */}
+                                {/* DUP Code, Volume & Meter */}
                                 <td className="border border-black py-0.5 px-0.5 font-bold w-1/4 text-black text-center">
                                   {dup ? (
                                     <div className="flex flex-col items-center justify-center leading-tight py-0.5">
                                       <span className="font-bold text-[9.5px]">{dup.code}</span>
+                                      {dup.duplicateMeter && (
+                                        <span className="text-[7.5px] font-mono font-black text-cyan-950 bg-cyan-100 border border-cyan-400 px-1 py-0.2 rounded mt-0.5">
+                                          {dup.duplicateMeter.toLowerCase().includes('m') ? dup.duplicateMeter : `${dup.duplicateMeter}m`}
+                                        </span>
+                                      )}
                                       <span className="text-[7.5px] font-mono font-black text-slate-900 bg-purple-100/90 border border-black/40 px-1 py-0.2 rounded mt-0.5">
                                         {dupVol ? dupVol.volumeCode : 'S/ VOL'}
                                       </span>

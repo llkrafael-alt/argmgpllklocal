@@ -41,6 +41,7 @@ interface ShipmentsViewProps {
   onEditAR: (ar: SampleShipmentAR) => void;
   onUpdateARWeight?: (arId: string, weightKg: number) => void | Promise<void>;
   onUpdateARShipmentDate?: (arId: string, shipmentDate: string) => void | Promise<void>;
+  onUpdateDuplicateMeter?: (arId: string, sampleIdOrCode: string, meter: string) => void | Promise<void>;
   onDeleteAR: (arId: string) => void;
   onOpenHoleDetailByCode: (holeCode: string) => void;
   onOpenPackingPlan: (ar: SampleShipmentAR, initialTab?: 'plan' | 'photos') => void;
@@ -59,6 +60,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   onEditAR,
   onUpdateARWeight,
   onUpdateARShipmentDate,
+  onUpdateDuplicateMeter,
   onDeleteAR,
   onOpenHoleDetailByCode,
   onOpenPackingPlan,
@@ -67,6 +69,31 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState<string>('ALL');
   const [isOreasReportModalOpen, setIsOreasReportModalOpen] = useState(false);
+
+  const handleUpdateDuplicateMeterInternal = async (
+    arId: string,
+    sampleIdOrCode: string,
+    meter: string
+  ) => {
+    if (onUpdateDuplicateMeter) {
+      await onUpdateDuplicateMeter(arId, sampleIdOrCode, meter);
+      return;
+    }
+    const targetAR = ars.find((a) => a.id === arId);
+    if (!targetAR) return;
+    const cleanMeter = meter.trim();
+    const updatedQaqc = (targetAR.qaqcSamples || []).map((s) => {
+      if (s.id === sampleIdOrCode || s.code === sampleIdOrCode) {
+        return {
+          ...s,
+          duplicateMeter: cleanMeter || undefined,
+          notes: cleanMeter ? `Metro: ${cleanMeter}` : s.notes,
+        };
+      }
+      return s;
+    });
+    await saveARToDb({ ...targetAR, qaqcSamples: updatedQaqc });
+  };
 
   // Inline weight editing state
   const [editingWeightArId, setEditingWeightArId] = useState<string | null>(null);
@@ -545,7 +572,11 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                   {ar.qaqcSamples && ar.qaqcSamples.length > 0 && (
                     <div className="pt-1 border-t border-slate-800/50">
                       <span className="text-[10px] text-slate-400 font-bold block mb-1">Padrões QA/QC:</span>
-                      <QaqcTableGrid samples={ar.qaqcSamples} />
+                      <QaqcTableGrid
+                        samples={ar.qaqcSamples}
+                        arId={ar.id}
+                        onUpdateDuplicateMeter={handleUpdateDuplicateMeterInternal}
+                      />
                     </div>
                   )}
 
@@ -737,7 +768,11 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
 
                     {/* QA/QC Standard Samples */}
                     <td className="py-2 px-3">
-                      <QaqcTableGrid samples={ar.qaqcSamples || []} />
+                      <QaqcTableGrid
+                        samples={ar.qaqcSamples || []}
+                        arId={ar.id}
+                        onUpdateDuplicateMeter={handleUpdateDuplicateMeterInternal}
+                      />
                     </td>
 
                     {/* Date (Inline Editable) */}

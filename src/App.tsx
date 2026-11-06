@@ -54,6 +54,7 @@ import { DeleteHoleModal } from './components/DeleteHoleModal';
 import { DeleteUserModal } from './components/DeleteUserModal';
 import { PackingPlanModal } from './components/PackingPlanModal';
 import { QAQCPdfReportModal } from './components/QAQCPdfReportModal';
+import { OreasStockReportModal } from './components/OreasStockReportModal';
 import { LocalDataModal } from './components/LocalDataModal';
 import { ThemeSelectorModal } from './components/ThemeSelectorModal';
 import { MobilePhotoSyncModal } from './components/MobilePhotoSyncModal';
@@ -131,6 +132,7 @@ export default function App() {
   const [arToEdit, setArToEdit] = useState<SampleShipmentAR | null>(null);
 
   const [isOreasStockModalOpen, setIsOreasStockModalOpen] = useState(false);
+  const [isOreasReportModalOpen, setIsOreasReportModalOpen] = useState(false);
   const [packingPlanAR, setPackingPlanAR] = useState<SampleShipmentAR | null>(null);
   const [packingPlanInitialTab, setPackingPlanInitialTab] = useState<'plan' | 'photos'>('plan');
 
@@ -1223,6 +1225,7 @@ export default function App() {
             activeUser={activeUser}
             onOpenCreateARModal={() => handleOpenCreateARModal()}
             onOpenOreasStockModal={() => setIsOreasStockModalOpen(true)}
+            onOpenOreasReportModal={() => setIsOreasReportModalOpen(true)}
             onOpenPdfReportModal={handleOpenPdfReportModal}
             onEditAR={handleOpenEditARModal}
             onUpdateARWeight={handleUpdateARWeight}
@@ -1286,6 +1289,7 @@ export default function App() {
         onSaveEntry={handleSaveOreasStockEntry}
         onDeleteEntry={handleDeleteOreasStockEntry}
         onDeleteCode={handleDeleteOreasCode}
+        onOpenReportModal={() => setIsOreasReportModalOpen(true)}
       />
 
       {isNewHoleModalOpen && (
@@ -1370,6 +1374,14 @@ export default function App() {
         holes={holes}
         photos={qaqcPhotos}
         defaultDate={pdfReportDefaultDate}
+      />
+
+      <OreasStockReportModal
+        isOpen={isOreasReportModalOpen}
+        onClose={() => setIsOreasReportModalOpen(false)}
+        oreasStockEntries={oreasStockEntries}
+        ars={ars}
+        activeUser={activeUser || { id: 'usr_default', name: 'Usuário Galpão', role: 'Controle de Amostras', createdAt: '' }}
       />
 
       <MobilePhotoSyncModal

@@ -187,6 +187,13 @@ export const WeeklyLabReport: React.FC<WeeklyLabReportProps> = ({
 
   // Trigger browser print
   const handlePrint = () => {
+    document.body.classList.add('print-lab-report-active');
+    const cleanup = () => {
+      document.body.classList.remove('print-lab-report-active');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    setTimeout(cleanup, 2500);
     window.print();
   };
 

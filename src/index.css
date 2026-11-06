@@ -36,7 +36,6 @@
   #root,
   #root > div,
   main,
-  div[class*="fixed"],
   div[class*="overflow-"] {
     overflow: visible !important;
     max-height: none !important;
@@ -55,34 +54,64 @@
     display: none !important;
   }
 
-  /* When printing from modal dialogs, completely hide the underlying main app layout so it does not create blank pages */
+  /* When printing from modal reports (Packing Plan, QAQC Photos, Oreas Stock), hide the underlying main app layout */
   body:has(#printable-packing-plan) main,
   body:has(#printable-qaqc-photo-album) main,
-  body:has(#printable-lab-report) main,
   body:has(#oreas-printable-report) main,
   body.print-packing-plan-active main,
-  body.print-packing-plan-active header,
-  body.print-packing-plan-active nav,
-  body.print-packing-plan-active footer {
+  body.print-qaqc-photo-active main,
+  body.print-oreas-report-active main {
     display: none !important;
   }
 
-  /* Reset all modal containers so they don't clip, scroll, or create extra pages */
-  div[class*="fixed"],
-  div[class*="backdrop-blur"],
-  div[class*="overflow-y-auto"],
-  div[class*="overflow-x-auto"] {
-    position: static !important;
-    overflow: visible !important;
-    max-height: none !important;
-    height: auto !important;
-    min-height: 0 !important;
+  /* When printing the in-page Weekly Lab Report, ENSURE main is completely visible and unrestricted */
+  body.print-lab-report-active main,
+  body:not(:has(#printable-packing-plan)):not(:has(#printable-qaqc-photo-album)):not(:has(#oreas-printable-report)) main {
+    display: block !important;
     width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Reset all modal overlays and cards so they don't clip, scroll, or create blank pages */
+  body:has(#printable-packing-plan) .fixed,
+  body:has(#printable-packing-plan) div[class*="fixed"],
+  body:has(#printable-qaqc-photo-album) .fixed,
+  body:has(#printable-qaqc-photo-album) div[class*="fixed"],
+  body:has(#oreas-printable-report) .fixed,
+  body:has(#oreas-printable-report) div[class*="fixed"],
+  body.print-packing-plan-active .fixed,
+  body.print-packing-plan-active div[class*="fixed"],
+  body.print-qaqc-photo-active .fixed,
+  body.print-qaqc-photo-active div[class*="fixed"],
+  body.print-oreas-report-active .fixed,
+  body.print-oreas-report-active div[class*="fixed"] {
+    position: static !important;
+    display: block !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
     margin: 0 !important;
+  }
+
+  /* Reset all card wrappers and flex containers inside active modal */
+  body:has(#printable-packing-plan) div[class*="fixed"] *,
+  body:has(#printable-qaqc-photo-album) div[class*="fixed"] *,
+  body:has(#oreas-printable-report) div[class*="fixed"] *,
+  body.print-packing-plan-active div[class*="fixed"] *,
+  body.print-qaqc-photo-active div[class*="fixed"] *,
+  body.print-oreas-report-active div[class*="fixed"] * {
+    max-height: none !important;
   }
 
   /* Strict Single-Page Packing Plan Document */
@@ -109,7 +138,7 @@
     break-before: avoid !important;
   }
 
-  /* Photo album and lab report printable targets */
+  /* Photo album, lab report, and OREAS report printable targets */
   #printable-qaqc-photo-album,
   #printable-lab-report,
   #oreas-printable-report,
@@ -126,17 +155,6 @@
     box-shadow: none !important;
     border: none !important;
     overflow: visible !important;
-  }
-
-  /* Ensure all contents inside print targets are visible */
-  #printable-packing-plan *,
-  #printable-qaqc-photo-album *,
-  #printable-lab-report *,
-  #oreas-printable-report *,
-  .print-area * {
-    visibility: visible !important;
-    color: #000000 !important;
-    text-shadow: none !important;
   }
 
   /* Preserve table header shading */
@@ -263,6 +281,102 @@
     text-align: center !important;
     font-size: 10px !important;
     padding: 2px 6px !important;
+  }
+
+  /* OREAS Stock Report Print Styles */
+  #oreas-printable-report > div {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1.5px solid #000000 !important;
+    border-radius: 4px !important;
+    padding: 12px !important;
+    box-shadow: none !important;
+  }
+
+  #oreas-printable-report div[class*="bg-slate-"],
+  #oreas-printable-report div[class*="bg-amber-"] {
+    background-color: #f8fafc !important;
+    border: 1px solid #000000 !important;
+    color: #000000 !important;
+  }
+
+  #oreas-printable-report h2,
+  #oreas-printable-report h3,
+  #oreas-printable-report h4,
+  #oreas-printable-report p,
+  #oreas-printable-report span,
+  #oreas-printable-report strong,
+  #oreas-printable-report td {
+    color: #000000 !important;
+  }
+
+  #oreas-printable-report table {
+    border: 1.5px solid #000000 !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+    background: #ffffff !important;
+  }
+
+  #oreas-printable-report th {
+    background-color: #d1d5db !important;
+    color: #000000 !important;
+    border: 1px solid #000000 !important;
+    padding: 4px 6px !important;
+    font-weight: 800 !important;
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+  }
+
+  #oreas-printable-report td {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #94a3b8 !important;
+    padding: 3px 6px !important;
+    font-size: 10px !important;
+  }
+
+  #oreas-printable-report tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* QA/QC Photo Album Print Styles */
+  #printable-qaqc-photo-album > div:first-child {
+    background-color: #f1f5f9 !important;
+    border: 1.5px solid #000000 !important;
+    color: #000000 !important;
+    border-radius: 4px !important;
+    padding: 8px 12px !important;
+  }
+
+  #printable-qaqc-photo-album > div:first-child * {
+    color: #000000 !important;
+  }
+
+  #printable-qaqc-photo-album div[class*="shadow-2xl"] {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  #printable-qaqc-photo-album div[class*="bg-slate-800"] {
+    background-color: #e2e8f0 !important;
+    border: 1px solid #000000 !important;
+    color: #000000 !important;
+  }
+
+  #printable-qaqc-photo-album div[class*="bg-slate-800"] * {
+    color: #000000 !important;
+  }
+
+  #printable-qaqc-photo-album div[class*="p-12"] {
+    background: #ffffff !important;
+    border: 1px solid #000000 !important;
+    color: #000000 !important;
+    border-radius: 4px !important;
   }
 
   .print-area button.no-print,

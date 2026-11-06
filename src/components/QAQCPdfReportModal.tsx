@@ -388,6 +388,34 @@ export const QAQCPdfReportModal: React.FC<QAQCPdfReportModalProps> = ({
             );
           }
         }
+
+        if (pageCount === 0) {
+          doc.setFillColor(15, 23, 42); // slate-900
+          doc.rect(10, 10, pageWidth - 20, 22, 'F');
+
+          doc.setTextColor(255, 255, 255);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(13);
+          doc.text('G MINING VENTURES - PROJETO GURUPI', 15, 19);
+
+          doc.setFontSize(9.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(203, 213, 225);
+          doc.text('RELATÓRIO OFICIAL DE FOTOS QA/QC', 15, 26);
+
+          doc.setFontSize(8.5);
+          doc.setTextColor(234, 179, 8); // gold
+          doc.setFont('helvetica', 'bold');
+          doc.text(`Data: ${displayDateStr}`, pageWidth - 15, 19, { align: 'right' });
+          doc.setTextColor(226, 232, 240);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`Total ARs: ${filteredARs.length}  •  Fotos: 0`, pageWidth - 15, 26, { align: 'right' });
+
+          doc.setTextColor(100, 116, 139);
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(10);
+          doc.text('Nenhum registro fotográfico de padrão QA/QC disponível para este período.', pageWidth / 2, 70, { align: 'center' });
+        }
       }
 
       // Save document
@@ -401,6 +429,13 @@ export const QAQCPdfReportModal: React.FC<QAQCPdfReportModalProps> = ({
   };
 
   const handlePrint = () => {
+    document.body.classList.add('print-qaqc-photo-active');
+    const cleanup = () => {
+      document.body.classList.remove('print-qaqc-photo-active');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    setTimeout(cleanup, 2500);
     window.print();
   };
 

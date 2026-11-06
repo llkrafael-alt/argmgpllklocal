@@ -876,8 +876,8 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
         </>
       )}
 
-      {/* OREAS Stock Report Modal */}
-      {isOreasReportModalOpen && (
+      {/* OREAS Stock Report Modal (fallback only if onOpenOreasReportModal not provided at root level) */}
+      {!onOpenOreasReportModal && isOreasReportModalOpen && (
         <OreasStockReportModal
           isOpen={isOreasReportModalOpen}
           onClose={() => setIsOreasReportModalOpen(false)}

@@ -78,6 +78,13 @@ export const OreasStockReportModal: React.FC<OreasStockReportModalProps> = ({
 
   // Handle Browser Native Print
   const handlePrint = () => {
+    document.body.classList.add('print-oreas-report-active');
+    const cleanup = () => {
+      document.body.classList.remove('print-oreas-report-active');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    setTimeout(cleanup, 2500);
     window.print();
   };
 

@@ -238,9 +238,9 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:static print:p-0 print:m-0 print:bg-transparent print:overflow-visible print:block">
       {/* Modal Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] h-fit">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] h-fit print:static print:border-none print:shadow-none print:bg-transparent print:p-0 print:m-0 print:max-w-full print:rounded-none print:overflow-visible print:block">
         {/* Top Controls Toolbar (Hidden during window.print) */}
         <div className="p-4 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0 no-print">
           <div className="flex items-center gap-2.5">
@@ -348,7 +348,7 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
         </div>
 
         {/* Document Body View Area */}
-        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-950 flex flex-col items-center justify-start grow min-h-0">
+        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-950 flex flex-col items-center justify-start grow min-h-0 print:static print:p-0 print:m-0 print:bg-transparent print:overflow-visible print:block">
           {activeViewTab === 'photos' && activeUser && onUploadPhoto && onDeletePhoto ? (
             <div className="w-full max-w-4xl">
               <QAQCPhotoGallery
@@ -446,7 +446,7 @@ export const PackingPlanModal: React.FC<PackingPlanModalProps> = ({
               {/* Printable Document Sheet Container */}
               <div
                 id="printable-packing-plan"
-                className="w-full max-w-[840px] bg-white text-black p-4 sm:p-5 rounded-xl shadow-2xl font-sans text-xs border border-slate-300 print:max-w-full print:p-2 print:border-none print:shadow-none"
+                className="w-full max-w-[840px] bg-white text-black p-4 sm:p-5 rounded-xl shadow-2xl font-sans text-xs border border-slate-300 print:max-w-full print:p-0 print:m-0 print:border-none print:shadow-none print:rounded-none"
                 style={{ color: '#000000', backgroundColor: '#ffffff' }}
               >
                 {/* 1. Document Header (Matching requested style with 4 centered lines + Company Logo) */}

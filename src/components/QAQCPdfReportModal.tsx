@@ -440,8 +440,8 @@ export const QAQCPdfReportModal: React.FC<QAQCPdfReportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] h-fit">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:static print:p-0 print:m-0 print:bg-transparent print:overflow-visible print:block">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] h-fit print:static print:border-none print:shadow-none print:bg-transparent print:p-0 print:m-0 print:max-w-full print:rounded-none print:overflow-visible print:block">
         {/* Top Header Toolbar */}
         <div className="p-4 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0 no-print">
           <div className="flex items-center gap-2.5">
@@ -519,7 +519,7 @@ export const QAQCPdfReportModal: React.FC<QAQCPdfReportModalProps> = ({
         </div>
 
         {/* Document Body View Area */}
-        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-950 flex flex-col items-center gap-6 grow min-h-0">
+        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-950 flex flex-col items-center gap-6 grow min-h-0 print:static print:p-0 print:m-0 print:bg-transparent print:overflow-visible print:block">
           <div className="w-full max-w-[800px] flex items-center justify-between text-xs text-slate-400 font-mono no-print">
             <span>Compilado Fotográfico do Envio: <strong className="text-white">{formatDateToPtBR(selectedDate)}</strong></span>
             <span>Total de Fotos: <strong className="text-cyan-400">{totalPhotosForDate}</strong></span>

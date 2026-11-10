@@ -339,9 +339,9 @@ export const OreasStockReportModal: React.FC<OreasStockReportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:static print:p-0 print:m-0 print:bg-transparent print:overflow-visible print:block">
       {/* Outer Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-5xl w-full shadow-2xl overflow-hidden my-4 max-h-[94vh] flex flex-col">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-5xl w-full shadow-2xl overflow-hidden my-4 max-h-[94vh] flex flex-col print:static print:border-none print:shadow-none print:bg-transparent print:p-0 print:m-0 print:max-w-full print:rounded-none print:overflow-visible print:block">
         {/* Modal Top Header (No print) */}
         <div className="no-print flex items-center justify-between px-5 py-4 bg-slate-950 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
@@ -491,7 +491,7 @@ export const OreasStockReportModal: React.FC<OreasStockReportModalProps> = ({
         </div>
 
         {/* Scrollable Printable Report Container */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950" id="oreas-printable-report">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 print:static print:p-0 print:m-0 print:bg-transparent print:overflow-visible print:block" id="oreas-printable-report">
           {/* Printable Document Paper Card */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl flex flex-col gap-6 text-slate-100">
             {/* Document Official Header */}

@@ -75,19 +75,25 @@
     overflow: visible !important;
   }
 
-  /* Reset all modal overlays and cards so they don't clip, scroll, or create blank pages */
-  body:has(#printable-packing-plan) .fixed,
+  /* Reset all modal overlays, modal cards, and container bodies so NO dark background, border, padding, or shadow appears around the document */
   body:has(#printable-packing-plan) div[class*="fixed"],
-  body:has(#printable-qaqc-photo-album) .fixed,
+  body:has(#printable-packing-plan) div[class*="fixed"] > div,
+  body:has(#printable-packing-plan) div[class*="fixed"] > div > div,
   body:has(#printable-qaqc-photo-album) div[class*="fixed"],
-  body:has(#oreas-printable-report) .fixed,
+  body:has(#printable-qaqc-photo-album) div[class*="fixed"] > div,
+  body:has(#printable-qaqc-photo-album) div[class*="fixed"] > div > div,
   body:has(#oreas-printable-report) div[class*="fixed"],
-  body.print-packing-plan-active .fixed,
+  body:has(#oreas-printable-report) div[class*="fixed"] > div,
+  body:has(#oreas-printable-report) div[class*="fixed"] > div > div,
   body.print-packing-plan-active div[class*="fixed"],
-  body.print-qaqc-photo-active .fixed,
+  body.print-packing-plan-active div[class*="fixed"] > div,
+  body.print-packing-plan-active div[class*="fixed"] > div > div,
   body.print-qaqc-photo-active div[class*="fixed"],
-  body.print-oreas-report-active .fixed,
-  body.print-oreas-report-active div[class*="fixed"] {
+  body.print-qaqc-photo-active div[class*="fixed"] > div,
+  body.print-qaqc-photo-active div[class*="fixed"] > div > div,
+  body.print-oreas-report-active div[class*="fixed"],
+  body.print-oreas-report-active div[class*="fixed"] > div,
+  body.print-oreas-report-active div[class*="fixed"] > div > div {
     position: static !important;
     display: block !important;
     inset: auto !important;
@@ -98,8 +104,10 @@
     min-height: 0 !important;
     overflow: visible !important;
     background: transparent !important;
+    background-color: transparent !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
   }

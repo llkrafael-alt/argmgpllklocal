@@ -1,6 +1,7 @@
 import React from 'react';
 import { DrillHole, ProductionLog } from '../types';
 import { calculateHoleSummary } from '../utils/calculator';
+import { getHoleTypeLabel, getHoleTypeBadgeClass } from '../constants/holeTypes';
 import {
   CheckCircle2,
   Box,
@@ -74,8 +75,6 @@ export const CompletedHolesView: React.FC<CompletedHolesViewProps> = ({
           {completedHoles.map((hole) => {
             const summary = calculateHoleSummary(hole, logs);
             const isRC = hole.holeType === 'RC';
-            const isSolo = hole.holeType === 'Solo';
-            const isTrincheira = hole.holeType === 'Trincheira';
 
             return (
               <div
@@ -85,20 +84,12 @@ export const CompletedHolesView: React.FC<CompletedHolesViewProps> = ({
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-xl font-black font-mono text-white">
                           {hole.code}
                         </h3>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          isRC
-                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                            : isSolo
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : isTrincheira
-                            ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        }`}>
-                          {isRC ? '🔄 RC' : isSolo ? '🌱 Solo' : isTrincheira ? '⛏️ Trincheira' : '💎 Diamantado'}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${getHoleTypeBadgeClass(hole.holeType)}`}>
+                          {getHoleTypeLabel(hole.holeType)}
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1">

@@ -1,4 +1,4 @@
-import { StageInfo, StageId } from '../types';
+import { StageInfo, StageId, HoleType } from '../types';
 
 export const DIAMOND_STAGES: StageInfo[] = [
   {
@@ -120,9 +120,9 @@ export const getStageById = (id: StageId): StageInfo => {
 
 export const getApplicableStages = (
   isLegacyKorePending?: boolean,
-  holeType?: 'Diamantado' | 'RC' | 'Solo' | 'Trincheira'
+  holeType?: HoleType
 ): StageInfo[] => {
-  if (holeType === 'Solo' || holeType === 'Trincheira') {
+  if (holeType === 'Solo' || holeType === 'Trincheira' || holeType === 'Reenvio') {
     return [];
   }
   if (holeType === 'RC') {

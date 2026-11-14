@@ -1,7 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { DrillHole, User, SampleShipmentAR, SampleRange } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { DrillHole, HoleType, User, SampleShipmentAR, SampleRange } from '../types';
 import { QaqcTableGrid } from './QaqcTableGrid';
 import { parseSampleRange, parseSampleRanges, getARVolumeCount, formatDateToPtBR, getNormalizedSampleRanges } from '../utils/calculator';
+import {
+  HOLE_TYPE_CONFIG,
+  HOLE_TYPE_ORDER,
+  getHoleTypeBadgeClass,
+  getHoleTypeLabel,
+  isValidHoleType,
+  normalizeSampleCode,
+  validateSampleRangesForHoleType,
+} from '../constants/holeTypes';
 import { saveARToDb } from '../services/firebase';
 import {
   X,
@@ -32,7 +41,7 @@ interface HoleDetailModalProps {
   onDeleteHoleRequest?: (hole: DrillHole) => void;
   onOpenPackingPlan?: (ar: SampleShipmentAR, initialTab?: 'plan' | 'photos') => void;
   onEditAR?: (ar: SampleShipmentAR) => void;
-  onUpdateHoleInfo?: (holeId: string, newCode: string, newTarget?: string) => void;
+  onUpdateHoleInfo?: (holeId: string, newCode: string, newTarget?: string, newHoleType?: HoleType | '') => void;
 }
 
 export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
@@ -52,10 +61,11 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
   const [editingStorage, setEditingStorage] = useState(false);
   const [storageInput, setStorageInput] = useState('');
 
-  // Hole Code & Target editing states
+  // Hole Code, Target & Type editing states
   const [editingHoleInfo, setEditingHoleInfo] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [targetInput, setTargetInput] = useState('');
+  const [holeTypeInput, setHoleTypeInput] = useState<HoleType | ''>('');
 
   // Sample plan edit form states
   const [sampleRanges, setSampleRanges] = useState<SampleRange[]>([
@@ -68,6 +78,7 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
     if (hole) {
       setCodeInput(hole.code || '');
       setTargetInput(hole.target || 'GERAL');
+      setHoleTypeInput(isValidHoleType(hole.holeType) ? hole.holeType : '');
       setEditingHoleInfo(false);
       setPlanErrorMsg('');
 
@@ -81,7 +92,16 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
         setSampleRanges([{ firstSampleCode: '', lastSampleCode: '' }]);
       }
     }
-  }, [hole?.id, hole?.firstSampleCode, hole?.lastSampleCode, JSON.stringify(hole?.sampleRanges), hole?.code, hole?.target]);
+  }, [hole?.id, hole?.firstSampleCode, hole?.lastSampleCode, JSON.stringify(hole?.sampleRanges), hole?.code, hole?.target, hole?.holeType]);
+
+  const effectiveHoleType: HoleType | undefined = editingHoleInfo
+    ? (isValidHoleType(holeTypeInput) ? holeTypeInput : undefined)
+    : (isValidHoleType(hole?.holeType) ? hole?.holeType : undefined);
+
+  const rangeLetterValidation = useMemo(
+    () => validateSampleRangesForHoleType(sampleRanges, effectiveHoleType),
+    [sampleRanges, effectiveHoleType]
+  );
 
   if (!isOpen || !hole) return null;
 
@@ -144,13 +164,29 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
 
     const cleanedRanges = sampleRanges
       .map((r) => ({
-        firstSampleCode: r.firstSampleCode.trim().toUpperCase(),
-        lastSampleCode: r.lastSampleCode.trim().toUpperCase(),
+        firstSampleCode: normalizeSampleCode(r.firstSampleCode),
+        lastSampleCode: normalizeSampleCode(r.lastSampleCode),
       }))
       .filter((r) => r.firstSampleCode !== '' || r.lastSampleCode !== '');
 
     if (cleanedRanges.length === 0) {
       setPlanErrorMsg('Informe ao menos uma faixa de amostras válida.');
+      return;
+    }
+
+    const incompleteIdx = cleanedRanges.findIndex((r) => !r.firstSampleCode || !r.lastSampleCode);
+    if (incompleteIdx !== -1) {
+      setPlanErrorMsg(
+        cleanedRanges.length > 1
+          ? `Preencha a primeira e a última amostra na Faixa ${incompleteIdx + 1}.`
+          : 'Preencha a primeira e a última amostra da faixa.'
+      );
+      return;
+    }
+
+    const letterCheck = validateSampleRangesForHoleType(cleanedRanges, effectiveHoleType);
+    if (!letterCheck.isValid) {
+      setPlanErrorMsg(letterCheck.messages[0]);
       return;
     }
 
@@ -178,6 +214,23 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
               <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono text-xs font-bold uppercase tracking-wider">
                 Furo / Amostragem
               </span>
+              <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${getHoleTypeBadgeClass(hole.holeType)}`}>
+                {getHoleTypeLabel(hole.holeType)}
+              </span>
+              {!hole.holeType && onUpdateHoleInfo && !editingHoleInfo && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCodeInput(hole.code);
+                    setTargetInput(hole.target || 'GERAL');
+                    setHoleTypeInput('');
+                    setEditingHoleInfo(true);
+                  }}
+                  className="px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-[11px] font-bold transition-colors"
+                >
+                  Definir tipo
+                </button>
+              )}
               {hole.createdByName && (
                 <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-xs font-medium">
                   Cadastrado por {hole.createdByName}
@@ -197,10 +250,11 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
                       onClick={() => {
                         setCodeInput(hole.code);
                         setTargetInput(hole.target || 'GERAL');
+                        setHoleTypeInput(isValidHoleType(hole.holeType) ? hole.holeType : '');
                         setEditingHoleInfo(true);
                       }}
                       className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors"
-                      title="Editar nome do furo e alvo"
+                      title="Editar nome do furo, alvo e tipo"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
@@ -213,8 +267,8 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2 bg-slate-900 p-3 rounded-xl border border-amber-500/40">
-                <div className="flex-1 w-full">
+              <div className="flex flex-col sm:flex-row items-start sm:items-end gap-2 mt-2 bg-slate-900 p-3 rounded-xl border border-amber-500/40 flex-wrap">
+                <div className="flex-1 min-w-[160px] w-full sm:w-auto">
                   <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Nome / Código do Furo:</label>
                   <input
                     type="text"
@@ -234,12 +288,32 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
                     placeholder="Ex: GERAL"
                   />
                 </div>
-                <div className="flex items-center gap-1.5 self-end sm:self-center mt-2 sm:mt-5">
+                <div className="w-full sm:w-44">
+                  <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Tipo de Furo:</label>
+                  <select
+                    value={holeTypeInput}
+                    onChange={(e) => setHoleTypeInput((e.target.value as HoleType) || '')}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs font-bold outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="">Sem tipo</option>
+                    {HOLE_TYPE_ORDER.map((typeKey) => (
+                      <option key={typeKey} value={typeKey}>
+                        {HOLE_TYPE_CONFIG[typeKey].label} ({HOLE_TYPE_CONFIG[typeKey].letterHint})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5 self-end">
                   <button
                     type="button"
                     onClick={() => {
                       if (!codeInput.trim()) return;
-                      onUpdateHoleInfo?.(hole.id, codeInput, targetInput);
+                      onUpdateHoleInfo?.(
+                        hole.id,
+                        codeInput,
+                        targetInput,
+                        isValidHoleType(holeTypeInput) ? holeTypeInput : ''
+                      );
                       setEditingHoleInfo(false);
                     }}
                     className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition-all flex items-center gap-1 shadow-sm"
@@ -342,62 +416,100 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
             <form onSubmit={handleSavePlan} className="flex flex-col gap-3">
               <div className="flex flex-col gap-2.5">
                 {sampleRanges.map((range, idx) => {
+                  const firstErr = rangeLetterValidation.fieldErrors[`${idx}:first`];
+                  const lastErr = rangeLetterValidation.fieldErrors[`${idx}:last`];
                   const singleCheck = parseSampleRange(range.firstSampleCode, range.lastSampleCode);
-                  const subCount = singleCheck.isValid ? singleCheck.count : 0;
+                  const subCount = !firstErr && !lastErr && singleCheck.isValid ? singleCheck.count : 0;
 
                   return (
                     <div
                       key={idx}
-                      className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center gap-3 relative"
+                      className={`p-3 rounded-lg bg-slate-900 border flex flex-col gap-2 relative ${
+                        firstErr || lastErr ? 'border-red-600/80' : 'border-slate-800'
+                      }`}
                     >
-                      <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded shrink-0">
-                        Faixa {idx + 1}
-                      </span>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                        <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded shrink-0">
+                          Faixa {idx + 1}
+                        </span>
 
-                      <div className="grid grid-cols-2 gap-2 flex-1 w-full">
-                        <input
-                          type="text"
-                          value={range.firstSampleCode}
-                          onChange={(e) => handleUpdateRange(idx, 'firstSampleCode', e.target.value)}
-                          placeholder="Primeira ex: S01637"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 font-mono text-white text-xs font-bold outline-none focus:border-amber-500"
-                        />
-                        <input
-                          type="text"
-                          value={range.lastSampleCode}
-                          onChange={(e) => handleUpdateRange(idx, 'lastSampleCode', e.target.value)}
-                          placeholder="Última ex: S01706"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 font-mono text-white text-xs font-bold outline-none focus:border-amber-500"
-                        />
+                        <div className="grid grid-cols-2 gap-2 flex-1 w-full">
+                          <input
+                            type="text"
+                            value={range.firstSampleCode}
+                            onChange={(e) => handleUpdateRange(idx, 'firstSampleCode', e.target.value)}
+                            onBlur={(e) => {
+                              const norm = normalizeSampleCode(e.target.value);
+                              if (norm !== range.firstSampleCode) handleUpdateRange(idx, 'firstSampleCode', norm);
+                            }}
+                            placeholder="Primeira ex: D00001"
+                            aria-invalid={Boolean(firstErr)}
+                            className={`w-full px-2.5 py-1.5 rounded-lg border font-mono text-xs font-bold outline-none ${
+                              firstErr
+                                ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400'
+                                : 'border-slate-700 bg-slate-950 text-white focus:border-amber-500'
+                            }`}
+                          />
+                          <input
+                            type="text"
+                            value={range.lastSampleCode}
+                            onChange={(e) => handleUpdateRange(idx, 'lastSampleCode', e.target.value)}
+                            onBlur={(e) => {
+                              const norm = normalizeSampleCode(e.target.value);
+                              if (norm !== range.lastSampleCode) handleUpdateRange(idx, 'lastSampleCode', norm);
+                            }}
+                            placeholder="Última ex: D00150"
+                            aria-invalid={Boolean(lastErr)}
+                            className={`w-full px-2.5 py-1.5 rounded-lg border font-mono text-xs font-bold outline-none ${
+                              lastErr
+                                ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400'
+                                : 'border-slate-700 bg-slate-950 text-white focus:border-amber-500'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          {subCount > 0 && (
+                            <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
+                              {subCount} un
+                            </span>
+                          )}
+
+                          {sampleRanges.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRange(idx)}
+                              className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors"
+                              title="Remover faixa"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                        {subCount > 0 && (
-                          <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
-                            {subCount} un
-                          </span>
-                        )}
-
-                        {sampleRanges.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveRange(idx)}
-                            className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors"
-                            title="Remover faixa"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
+                      {(firstErr || lastErr) && (
+                        <div className="text-[11px] text-red-300 font-medium flex flex-col gap-0.5 pl-1">
+                          {firstErr && <span>• {firstErr}</span>}
+                          {lastErr && lastErr !== firstErr && <span>• {lastErr}</span>}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
 
-              {planErrorMsg && (
-                <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-800 text-[11px] text-red-300 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                  <span>{planErrorMsg}</span>
+              {(planErrorMsg || !rangeLetterValidation.isValid) && (
+                <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-800 text-[11px] text-red-200 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <div className="flex flex-col gap-0.5">
+                    {planErrorMsg && <span>{planErrorMsg}</span>}
+                    {rangeLetterValidation.messages
+                      .filter((m) => m !== planErrorMsg)
+                      .map((m, i) => (
+                        <span key={i}>{m}</span>
+                      ))}
+                  </div>
                 </div>
               )}
 
@@ -412,7 +524,12 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
 
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-sm"
+                  disabled={!rangeLetterValidation.isValid}
+                  className={`px-4 py-2 font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-sm ${
+                    !rangeLetterValidation.isValid
+                      ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                      : 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer'
+                  }`}
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Atualizar Plano</span>

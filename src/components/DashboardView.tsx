@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { DrillHole, SampleShipmentAR, User, OreasStockEntry, ProductionLog } from '../types';
+import { DrillHole, HoleType, SampleShipmentAR, User, OreasStockEntry, ProductionLog } from '../types';
 import {
   calculateDashboardKpis,
   filterARsByPeriod,
@@ -16,6 +16,13 @@ import { ShipmentsByWeekChart } from './dashboard/ShipmentsByWeekChart';
 import { HolesByStatusChart } from './dashboard/HolesByStatusChart';
 import { OreasStockChart } from './dashboard/OreasStockChart';
 import { parseSampleRanges, getARVolumeCount, getNormalizedSampleRanges } from '../utils/calculator';
+import {
+  HOLE_TYPE_CONFIG,
+  HOLE_TYPE_ORDER,
+  getHoleTypeBadgeClass,
+  getHoleTypeLabel,
+  isValidHoleType,
+} from '../constants/holeTypes';
 import { QaqcTableGrid } from './QaqcTableGrid';
 import {
   Search,
@@ -48,7 +55,7 @@ interface DashboardViewProps {
   onOpenPackingPlan?: (ar: SampleShipmentAR, initialTab?: 'plan' | 'photos') => void;
   onOpenCreateARModal?: (holeId?: string) => void;
   onEditAR?: (ar: SampleShipmentAR) => void;
-  onUpdateHoleInfo?: (holeId: string, newCode: string, newTarget?: string) => void;
+  onUpdateHoleInfo?: (holeId: string, newCode: string, newTarget?: string, newHoleType?: HoleType | '') => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -152,12 +159,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // ==========================================================================
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTarget, setSelectedTarget] = useState<string>('ALL');
+  const [selectedType, setSelectedType] = useState<'ALL' | 'SEM_TIPO' | HoleType>('ALL');
   const [selectedDate, setSelectedDate] = useState<string>('ALL');
 
   // Inline editing state for holes
   const [editingHoleId, setEditingHoleId] = useState<string | null>(null);
   const [editCodeInput, setEditCodeInput] = useState('');
   const [editTargetInput, setEditTargetInput] = useState('');
+  const [editHoleTypeInput, setEditHoleTypeInput] = useState<HoleType | ''>('');
 
   // Targets options
   const targets = useMemo(() => {
@@ -177,15 +186,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       const matchesTarget = selectedTarget === 'ALL' || hole.target === selectedTarget;
 
+      const matchesType =
+        selectedType === 'ALL'
+          ? true
+          : selectedType === 'SEM_TIPO'
+          ? !hole.holeType
+          : hole.holeType === selectedType;
+
       const matchesDate =
         selectedDate === 'ALL' ||
         !selectedDate ||
         holeDateOnly === selectedDate ||
         hole.createdAt.startsWith(selectedDate);
 
-      return matchesSearch && matchesTarget && matchesDate;
+      return matchesSearch && matchesTarget && matchesType && matchesDate;
     });
-  }, [holes, searchTerm, selectedTarget, selectedDate]);
+  }, [holes, searchTerm, selectedTarget, selectedType, selectedDate]);
+
+  const regularHoles = useMemo(
+    () => filteredHoles.filter((h) => h.holeType !== 'Reenvio'),
+    [filteredHoles]
+  );
+
+  const reenvioHoles = useMemo(
+    () => filteredHoles.filter((h) => h.holeType === 'Reenvio'),
+    [filteredHoles]
+  );
 
   return (
     <div className="flex flex-col gap-6 pb-12">
@@ -350,6 +376,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </select>
               </div>
 
+              {/* Type Filter */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value as 'ALL' | 'SEM_TIPO' | HoleType)}
+                  className="px-3 py-2 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-200 outline-none focus:border-amber-500 cursor-pointer"
+                  aria-label="Filtrar furos por tipo"
+                >
+                  <option value="ALL">Todos os Tipos ({holes.length})</option>
+                  {HOLE_TYPE_ORDER.map((tKey) => (
+                    <option key={tKey} value={tKey}>
+                      {HOLE_TYPE_CONFIG[tKey].label} ({holes.filter((h) => h.holeType === tKey).length})
+                    </option>
+                  ))}
+                  <option value="SEM_TIPO">
+                    Sem tipo ({holes.filter((h) => !h.holeType).length})
+                  </option>
+                </select>
+              </div>
+
               {/* Date Filter Input */}
               <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
                 <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
@@ -392,100 +438,141 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
             </div>
           ) : (
-            <div className="flex flex-col gap-5">
-              {filteredHoles.map((hole) => {
-                const holeARs = ars.filter((ar) => ar.drillHoleId === hole.id);
-                const holeShippedSamples = holeARs.reduce((acc, ar) => acc + (ar.sampleCount || 0), 0);
+            <div className="flex flex-col gap-6">
+              {(() => {
+                const renderHoleCard = (hole: DrillHole) => {
+                  const holeARs = ars.filter((ar) => ar.drillHoleId === hole.id);
+                  const holeShippedSamples = holeARs.reduce((acc, ar) => acc + (ar.sampleCount || 0), 0);
 
-                const multiParsed = parseSampleRanges(hole.sampleRanges, hole.firstSampleCode, hole.lastSampleCode);
-                const plannedCount = hole.calculatedSampleCount || (multiParsed.isValid ? multiParsed.totalCount : 0);
+                  const multiParsed = parseSampleRanges(hole.sampleRanges, hole.firstSampleCode, hole.lastSampleCode);
+                  const plannedCount = hole.calculatedSampleCount || (multiParsed.isValid ? multiParsed.totalCount : 0);
 
-                const displayRanges = hole.sampleRanges && hole.sampleRanges.length > 0
-                  ? hole.sampleRanges
-                  : (hole.firstSampleCode && hole.lastSampleCode ? [{ firstSampleCode: hole.firstSampleCode, lastSampleCode: hole.lastSampleCode }] : []);
+                  const displayRanges = hole.sampleRanges && hole.sampleRanges.length > 0
+                    ? hole.sampleRanges
+                    : (hole.firstSampleCode && hole.lastSampleCode ? [{ firstSampleCode: hole.firstSampleCode, lastSampleCode: hole.lastSampleCode }] : []);
 
-                return (
-                  <div
-                    key={hole.id}
-                    className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg hover:border-slate-700 transition-all flex flex-col gap-5"
-                  >
-                    {/* Hole Card Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
-                      <div className="flex-1">
-                        {editingHoleId === hole.id ? (
-                          <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-950 border border-amber-500/40 rounded-xl mb-2">
-                            <div className="flex-1 min-w-[150px]">
-                              <label className="text-[10px] text-slate-400 font-bold block mb-1">CÓDIGO DO FURO / AMOSTRA</label>
-                              <input
-                                type="text"
-                                value={editCodeInput}
-                                onChange={(e) => setEditCodeInput(e.target.value.toUpperCase())}
-                                className="w-full px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-sm font-bold outline-none focus:border-amber-500"
-                              />
+                  const reenvioReason =
+                    hole.holeType === 'Reenvio'
+                      ? holeARs.map((a) => a.notes).find((n) => n && n.trim() !== '' && !n.startsWith('AR gerado'))
+                      : undefined;
+
+                  return (
+                    <div
+                      key={hole.id}
+                      className={`p-6 rounded-2xl bg-slate-900 border shadow-lg transition-all flex flex-col gap-5 ${
+                        hole.holeType === 'Reenvio'
+                          ? 'border-purple-500/40 hover:border-purple-400/60'
+                          : 'border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {/* Hole Card Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+                        <div className="flex-1">
+                          {editingHoleId === hole.id ? (
+                            <div className="flex flex-wrap items-end gap-2 p-3 bg-slate-950 border border-amber-500/40 rounded-xl mb-2">
+                              <div className="flex-1 min-w-[150px]">
+                                <label className="text-[10px] text-slate-400 font-bold block mb-1">CÓDIGO DO FURO / AMOSTRA</label>
+                                <input
+                                  type="text"
+                                  value={editCodeInput}
+                                  onChange={(e) => setEditCodeInput(e.target.value.toUpperCase())}
+                                  className="w-full px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-sm font-bold outline-none focus:border-amber-500"
+                                />
+                              </div>
+                              <div className="w-28">
+                                <label className="text-[10px] text-slate-400 font-bold block mb-1">ALVO</label>
+                                <input
+                                  type="text"
+                                  value={editTargetInput}
+                                  onChange={(e) => setEditTargetInput(e.target.value.toUpperCase())}
+                                  className="w-full px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-bold outline-none focus:border-amber-500"
+                                />
+                              </div>
+                              <div className="w-40">
+                                <label className="text-[10px] text-slate-400 font-bold block mb-1">TIPO DE FURO</label>
+                                <select
+                                  value={editHoleTypeInput}
+                                  onChange={(e) => setEditHoleTypeInput((e.target.value as HoleType) || '')}
+                                  className="w-full px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-bold outline-none focus:border-amber-500 cursor-pointer"
+                                >
+                                  <option value="">Sem tipo</option>
+                                  {HOLE_TYPE_ORDER.map((tKey) => (
+                                    <option key={tKey} value={tKey}>
+                                      {HOLE_TYPE_CONFIG[tKey].label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex items-center gap-1 mt-4">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!editCodeInput.trim()) return;
+                                    onUpdateHoleInfo?.(
+                                      hole.id,
+                                      editCodeInput,
+                                      editTargetInput,
+                                      isValidHoleType(editHoleTypeInput) ? editHoleTypeInput : ''
+                                    );
+                                    setEditingHoleId(null);
+                                  }}
+                                  className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition-all"
+                                >
+                                  Salvar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingHoleId(null)}
+                                  className="px-2 py-1 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs rounded-lg transition-all"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
                             </div>
-                            <div className="w-28">
-                              <label className="text-[10px] text-slate-400 font-bold block mb-1">ALVO</label>
-                              <input
-                                type="text"
-                                value={editTargetInput}
-                                onChange={(e) => setEditTargetInput(e.target.value.toUpperCase())}
-                                className="w-full px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-bold outline-none focus:border-amber-500"
-                              />
-                            </div>
-                            <div className="flex items-center gap-1 mt-4">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (!editCodeInput.trim()) return;
-                                  onUpdateHoleInfo?.(hole.id, editCodeInput, editTargetInput);
-                                  setEditingHoleId(null);
-                                }}
-                                className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition-all"
-                              >
-                                Salvar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingHoleId(null)}
-                                className="px-2 py-1 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs rounded-lg transition-all"
-                              >
-                                Cancelar
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-xl font-black font-mono text-white tracking-tight">
-                              {hole.code}
-                            </h3>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-xl font-black font-mono text-white tracking-tight">
+                                {hole.code}
+                              </h3>
 
-                            {onUpdateHoleInfo && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingHoleId(hole.id);
-                                  setEditCodeInput(hole.code);
-                                  setEditTargetInput(hole.target || 'GERAL');
-                                }}
-                                className="p-1 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors"
-                                title="Editar nome do furo e alvo"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-
-                            <span className="text-xs px-2.5 py-0.5 rounded-md bg-slate-800 font-semibold text-amber-300 border border-amber-500/30">
-                              Alvo: {hole.target || 'GERAL'}
-                            </span>
-
-                            {hole.createdByName && (
-                              <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                                <UserCheck className="w-3.5 h-3.5 text-slate-500" />
-                                {hole.createdByName}
+                              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md ${getHoleTypeBadgeClass(hole.holeType)}`}>
+                                {getHoleTypeLabel(hole.holeType)}
                               </span>
-                            )}
-                          </div>
-                        )}
+
+                              {onUpdateHoleInfo && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingHoleId(hole.id);
+                                    setEditCodeInput(hole.code);
+                                    setEditTargetInput(hole.target || 'GERAL');
+                                    setEditHoleTypeInput(isValidHoleType(hole.holeType) ? hole.holeType : '');
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors"
+                                  title="Editar nome do furo, alvo e tipo"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              <span className="text-xs px-2.5 py-0.5 rounded-md bg-slate-800 font-semibold text-amber-300 border border-amber-500/30">
+                                Alvo: {hole.target || 'GERAL'}
+                              </span>
+
+                              {hole.createdByName && (
+                                <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                                  <UserCheck className="w-3.5 h-3.5 text-slate-500" />
+                                  {hole.createdByName}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {reenvioReason && (
+                            <p className="text-xs text-purple-200 bg-purple-950/50 border border-purple-800/60 px-2.5 py-1 rounded-lg mt-1.5 inline-block">
+                              <strong className="text-purple-300">Motivo / Obs.:</strong> {reenvioReason}
+                            </p>
+                          )}
 
                         {displayRanges.length > 0 ? (
                           <div className="text-xs font-mono text-slate-300 mt-1 flex flex-wrap items-center gap-2">
@@ -649,7 +736,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                   </div>
                 );
-              })}
+                };
+
+                return (
+                  <>
+                    {regularHoles.length > 0 && (
+                      <div className="flex flex-col gap-5">
+                        {reenvioHoles.length > 0 && (
+                          <div className="flex items-center justify-between px-1">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-300">
+                              Furos e Amostragem ({regularHoles.length})
+                            </h3>
+                          </div>
+                        )}
+                        {regularHoles.map(renderHoleCard)}
+                      </div>
+                    )}
+
+                    {reenvioHoles.length > 0 && (
+                      <div className="flex flex-col gap-4 p-4 rounded-2xl bg-purple-950/15 border border-purple-500/30">
+                        <div className="flex items-center justify-between px-1">
+                          <h3 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
+                            <span>Reenvio / Reanálise ({reenvioHoles.length})</span>
+                          </h3>
+                          <span className="text-[11px] text-purple-300/80">
+                            Grupo separado de reenvios e reanálises
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-5">
+                          {reenvioHoles.map(renderHoleCard)}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

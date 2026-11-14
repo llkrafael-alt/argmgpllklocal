@@ -1,5 +1,6 @@
 import React from 'react';
 import { DrillHole, ProductionLog } from '../types';
+import { getHoleTypeLabel, getHoleTypeBadgeClass } from '../constants/holeTypes';
 import { AlertTriangle, Trash2, X, Box, Layers, Tag } from 'lucide-react';
 
 interface DeleteHoleModalProps {
@@ -60,12 +61,8 @@ export const DeleteHoleModal: React.FC<DeleteHoleModalProps> = ({
               <span className="text-xs font-mono font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md">
                 {hole.code}
               </span>
-              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded ${
-                hole.holeType === 'RC'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-              }`}>
-                {hole.holeType === 'RC' ? '🔄 RC' : '💎 Diamantado'}
+              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded ${getHoleTypeBadgeClass(hole.holeType)}`}>
+                {getHoleTypeLabel(hole.holeType)}
               </span>
             </div>
 

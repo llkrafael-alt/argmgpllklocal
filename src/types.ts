@@ -48,10 +48,12 @@ export interface SampleRange {
   lastSampleCode: string;
 }
 
+export type HoleType = 'Diamantado' | 'RC' | 'Solo' | 'Trincheira' | 'Reenvio';
+
 export interface DrillHole {
   id: string;
   code: string; // e.g., "GUD-26-051"
-  holeType?: 'Diamantado' | 'RC' | 'Solo' | 'Trincheira'; // Drilling method: Diamantado (Diamond), RC, Solo (Soil) or Trincheira (Trench)
+  holeType?: HoleType; // Drilling method or Reenvio/Reanálise
   startMeter: number; // e.g., 0
   endMeter: number; // e.g., 200
   totalMeters: number; // endMeter - startMeter
@@ -97,6 +99,7 @@ export interface SampleShipmentAR {
   arCode: string;          // e.g. "ARGMGP-300"
   drillHoleId: string;     // e.g. "hole_1"
   drillHoleCode: string;   // e.g. "GUD-26-051"
+  holeType?: HoleType;
   startSampleCode: string; // e.g. "D01036"
   endSampleCode: string;   // e.g. "D01135"
   sampleRanges?: SampleRange[]; // Múltiplas faixas do envio/AR

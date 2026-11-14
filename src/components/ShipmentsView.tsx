@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
-import { DrillHole, SampleShipmentAR, OreasStockEntry, QAQCSamplePhoto, User } from '../types';
+import React, { useState, useMemo } from 'react';
+import { DrillHole, HoleType, SampleShipmentAR, OreasStockEntry, QAQCSamplePhoto, User } from '../types';
 import { calculateOreasBalances } from '../utils/oreasStock';
 import { getARVolumeCount, formatDateToPtBR, getNormalizedSampleRanges, isPhotoMatchingAR } from '../utils/calculator';
+import {
+  HOLE_TYPE_CONFIG,
+  HOLE_TYPE_ORDER,
+  getHoleTypeBadgeClass,
+  getHoleTypeLabel,
+  resolveArHoleType,
+} from '../constants/holeTypes';
 import { saveARToDb } from '../services/firebase';
 import { QaqcTableGrid } from './QaqcTableGrid';
 import { WeeklyLabReport } from './WeeklyLabReport';
@@ -67,6 +74,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'report'>('list');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedType, setSelectedType] = useState<'ALL' | 'SEM_TIPO' | HoleType>('ALL');
   const [selectedDate, setSelectedDate] = useState<string>('ALL');
   const [isOreasReportModalOpen, setIsOreasReportModalOpen] = useState(false);
 
@@ -192,6 +200,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   const filteredARs = sortedARs.filter((ar) => {
     const arDateOnly = ar.shipmentDate ? ar.shipmentDate.split('T')[0] : '';
     const formattedDate = formatDateToPtBR(ar.shipmentDate);
+    const arType = resolveArHoleType(ar, holes);
 
     const matchesSearch =
       ar.arCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -206,14 +215,31 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
             q.type.toLowerCase().includes(searchTerm.toLowerCase())
         ));
 
+    const matchesType =
+      selectedType === 'ALL'
+        ? true
+        : selectedType === 'SEM_TIPO'
+        ? !arType
+        : arType === selectedType;
+
     const matchesDate =
       selectedDate === 'ALL' ||
       !selectedDate ||
       arDateOnly === selectedDate ||
       ar.shipmentDate === selectedDate;
 
-    return matchesSearch && matchesDate;
+    return matchesSearch && matchesType && matchesDate;
   });
+
+  const regularARs = useMemo(
+    () => filteredARs.filter((ar) => resolveArHoleType(ar, holes) !== 'Reenvio'),
+    [filteredARs, holes]
+  );
+
+  const reenvioARs = useMemo(
+    () => filteredARs.filter((ar) => resolveArHoleType(ar, holes) === 'Reenvio'),
+    [filteredARs, holes]
+  );
 
   return (
     <div className="flex flex-col gap-6 pb-12">
@@ -322,6 +348,24 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                 )}
               </div>
 
+              {/* Type Filter */}
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value as 'ALL' | 'SEM_TIPO' | HoleType)}
+                className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-bold text-xs outline-none focus:border-cyan-500 cursor-pointer"
+                aria-label="Filtrar remessas por tipo"
+              >
+                <option value="ALL">Todos os Tipos ({sortedARs.length})</option>
+                {HOLE_TYPE_ORDER.map((tKey) => (
+                  <option key={tKey} value={tKey}>
+                    {HOLE_TYPE_CONFIG[tKey].label} ({sortedARs.filter((a) => resolveArHoleType(a, holes) === tKey).length})
+                  </option>
+                ))}
+                <option value="SEM_TIPO">
+                  Sem tipo ({sortedARs.filter((a) => !resolveArHoleType(a, holes)).length})
+                </option>
+              </select>
+
               {/* Quick Select Dropdown of Available Shipment Dates */}
               {availableDates.length > 0 && (
                 <select
@@ -403,30 +447,24 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
         </div>
       ) : (
         <>
-          {/* Mobile AR Cards View */}
-          <div className="block md:hidden space-y-3">
-            <div className="flex items-center justify-between px-1 mb-1">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Truck className="w-4 h-4 text-cyan-400" />
-                <span>Relação de ARs ({filteredARs.length})</span>
-              </h3>
-              <span className="text-[10px] text-slate-500 font-mono">
-                Sequencial ativo
-              </span>
-            </div>
-
-            {filteredARs.map((ar) => {
+          {(() => {
+            const renderArMobileCard = (ar: SampleShipmentAR) => {
               const arPhotosCount = photos.filter((p) => isPhotoMatchingAR(p, ar)).length;
               const ranges = getNormalizedSampleRanges(ar.sampleRanges, ar.startSampleCode, ar.endSampleCode);
+              const arType = resolveArHoleType(ar, holes);
 
               return (
                 <div
                   key={ar.id}
-                  className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md flex flex-col gap-3 transition-all hover:border-slate-700"
+                  className={`p-4 rounded-2xl bg-slate-900 border shadow-md flex flex-col gap-3 transition-all ${
+                    arType === 'Reenvio'
+                      ? 'border-purple-500/40 hover:border-purple-400/60'
+                      : 'border-slate-800 hover:border-slate-700'
+                  }`}
                 >
-                  {/* Card Header: AR Code & Drill Hole */}
-                  <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
-                    <div className="flex items-center gap-2">
+                  {/* Card Header: AR Code, Type Badge & Drill Hole */}
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-black text-cyan-300 px-2.5 py-1 rounded bg-cyan-950/90 border border-cyan-800 text-xs">
                         {ar.arCode}
                       </span>
@@ -438,6 +476,9 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                       >
                         {ar.drillHoleCode}
                       </button>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getHoleTypeBadgeClass(arType)}`}>
+                        {getHoleTypeLabel(arType)}
+                      </span>
                     </div>
                     {editingDateArId === ar.id ? (
                       <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-cyan-500 shadow-md">
@@ -568,6 +609,13 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                     ))}
                   </div>
 
+                  {/* Notes (útil para motivo de Reenvio) */}
+                  {arType === 'Reenvio' && ar.notes && !ar.notes.startsWith('AR gerado') && (
+                    <div className="text-[11px] text-purple-200 bg-purple-950/40 border border-purple-800/50 px-2.5 py-1.5 rounded-lg">
+                      <strong className="text-purple-300">Motivo / Obs.:</strong> {ar.notes}
+                    </div>
+                  )}
+
                   {/* QA/QC Standards */}
                   {ar.qaqcSamples && ar.qaqcSamples.length > 0 && (
                     <div className="pt-1 border-t border-slate-800/50">
@@ -626,26 +674,240 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                   </div>
                 </div>
               );
-            })}
-          </div>
+            };
 
-          {/* Desktop Table View */}
-          <div className="hidden md:block p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg overflow-x-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <Truck className="w-4 h-4 text-cyan-400" />
-                Relação Sequencial de Envio de Amostras ({filteredARs.length} registros)
-              </h3>
-              <span className="text-[11px] text-slate-400 font-mono">
-                Regra: Máximo de 200 amostras por lote/AR • Todos os campos editáveis
-              </span>
-            </div>
+            const renderArTableRow = (ar: SampleShipmentAR) => {
+              const arType = resolveArHoleType(ar, holes);
 
-            <table className="w-full text-left text-xs border-collapse min-w-[850px]">
+              return (
+                <tr key={ar.id} className="hover:bg-slate-800/40 transition-colors">
+                  {/* AR Code */}
+                  <td className="py-3.5 px-3">
+                    <span className="font-mono font-black text-cyan-300 px-2.5 py-1 rounded bg-cyan-950/80 border border-cyan-800 text-xs whitespace-nowrap">
+                      {ar.arCode}
+                    </span>
+                  </td>
+
+                  {/* Hole Code & Type Badge */}
+                  <td className="py-3.5 px-3">
+                    <div className="flex flex-col items-start gap-1">
+                      <button
+                        onClick={() => onOpenHoleDetailByCode(ar.drillHoleCode)}
+                        className="font-mono font-bold text-white hover:text-amber-400 hover:underline transition-colors"
+                        title="Clique para ver o histórico do furo"
+                      >
+                        {ar.drillHoleCode}
+                      </button>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${getHoleTypeBadgeClass(arType)}`}>
+                        {getHoleTypeLabel(arType)}
+                      </span>
+                      {arType === 'Reenvio' && ar.notes && !ar.notes.startsWith('AR gerado') && (
+                        <span className="text-[10px] text-purple-300/90 max-w-[180px] truncate" title={ar.notes}>
+                          {ar.notes}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Sample Range */}
+                  <td className="py-3.5 px-3">
+                    <div className="flex flex-col gap-1">
+                      {getNormalizedSampleRanges(ar.sampleRanges, ar.startSampleCode, ar.endSampleCode).map((r, idx) => (
+                        <span key={idx} className="font-mono font-semibold text-slate-200 bg-slate-800 px-2 py-1 rounded border border-slate-700 text-[11px] whitespace-nowrap">
+                          {r.firstSampleCode} a {r.lastSampleCode}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+
+                  {/* Sample Count */}
+                  <td className="py-3.5 px-3 text-center font-mono font-black text-emerald-400">
+                    {ar.sampleCount}
+                    {ar.sampleCount > 200 && (
+                      <span className="text-[9px] text-red-400 block font-normal">
+                        ! &gt; 200
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Volumes */}
+                  <td className="py-3.5 px-3 text-center font-mono text-slate-300">
+                    {getARVolumeCount(ar)} vol.
+                  </td>
+
+                  {/* Weight (Inline Editable) */}
+                  <td className="py-3.5 px-3 text-center">
+                    {editingWeightArId === ar.id ? (
+                      <div className="inline-flex items-center gap-1.5 justify-center bg-slate-950 px-2 py-1 rounded-xl border border-purple-500 shadow-lg shadow-purple-950/40">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoFocus
+                          value={editingWeightValue}
+                          onChange={(e) => setEditingWeightValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveWeight(ar);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              handleCancelEditWeight();
+                            }
+                          }}
+                          placeholder="0.0"
+                          className="w-16 px-1.5 py-1 text-xs text-center font-mono font-bold bg-slate-900 text-purple-200 rounded-lg border border-slate-700 focus:outline-none focus:border-purple-400"
+                        />
+                        <span className="text-[10px] text-slate-400 font-mono font-semibold">kg</span>
+                        <button
+                          type="button"
+                          disabled={isSavingWeight}
+                          onClick={() => handleSaveWeight(ar)}
+                          className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
+                          title="Salvar peso (Enter)"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingWeight}
+                          onClick={handleCancelEditWeight}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                          title="Cancelar (Esc)"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditWeight(ar)}
+                        className="group inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-purple-950/40 border border-transparent hover:border-purple-800/60 transition-all cursor-pointer font-mono text-xs"
+                        title="Clique para editar o peso diretamente"
+                      >
+                        {ar.weightKg !== undefined && ar.weightKg !== null && ar.weightKg > 0 ? (
+                          <>
+                            <span className="text-purple-300 font-bold group-hover:text-purple-200">{ar.weightKg} kg</span>
+                            <Edit2 className="w-3 h-3 text-purple-400/50 group-hover:text-purple-300 transition-colors" />
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 group-hover:text-purple-300 bg-slate-800/50 group-hover:bg-purple-950/50 px-2 py-0.5 rounded-md border border-dashed border-slate-700 group-hover:border-purple-600 transition-all">
+                            <Scale className="w-3 h-3 text-purple-400" />
+                            <span>Inserir peso</span>
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </td>
+
+                  {/* QA/QC Standard Samples */}
+                  <td className="py-2 px-3">
+                    <QaqcTableGrid
+                      samples={ar.qaqcSamples || []}
+                      arId={ar.id}
+                      onUpdateDuplicateMeter={handleUpdateDuplicateMeterInternal}
+                    />
+                  </td>
+
+                  {/* Date (Inline Editable) */}
+                  <td className="py-3.5 px-3">
+                    {editingDateArId === ar.id ? (
+                      <div className="inline-flex items-center gap-1.5 justify-center bg-slate-950 px-2 py-1 rounded-xl border border-cyan-500 shadow-lg shadow-cyan-950/40">
+                        <input
+                          type="date"
+                          autoFocus
+                          value={editingDateValue}
+                          onChange={(e) => setEditingDateValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveDate(ar);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              handleCancelEditDate();
+                            }
+                          }}
+                          className="px-2 py-1 text-xs font-mono font-bold bg-slate-900 text-cyan-200 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-400 cursor-pointer"
+                        />
+                        <button
+                          type="button"
+                          disabled={isSavingDate || !editingDateValue}
+                          onClick={() => handleSaveDate(ar)}
+                          className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
+                          title="Salvar data de envio (Enter)"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingDate}
+                          onClick={handleCancelEditDate}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                          title="Cancelar (Esc)"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditDate(ar)}
+                        className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-cyan-950/40 border border-transparent hover:border-cyan-800/60 transition-all cursor-pointer font-mono text-xs text-slate-300 hover:text-cyan-200"
+                        title="Clique para editar a data de envio diretamente"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-cyan-400/70 group-hover:text-cyan-300 transition-colors" />
+                        <span className="font-medium">{formatDateToPtBR(ar.shipmentDate) || 'Definir data'}</span>
+                        <Edit2 className="w-3 h-3 text-cyan-400/40 group-hover:text-cyan-300 transition-colors ml-0.5" />
+                      </button>
+                    )}
+                  </td>
+
+                  {/* Actions */}
+                  <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => onOpenPackingPlan(ar, 'photos')}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-bold text-[11px] flex items-center gap-1 transition-all min-h-[36px]"
+                        title="Tirar e visualizar fotos dos padrões QA/QC deste AR"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{photos.filter((p) => isPhotoMatchingAR(p, ar)).length} Fotos</span>
+                      </button>
+
+                      <button
+                        onClick={() => onOpenPackingPlan(ar, 'plan')}
+                        className="px-2.5 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 active:bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold text-[11px] flex items-center gap-1.5 transition-all shadow-xs min-h-[36px]"
+                        title="Gerar Plano de Empacotamento do Envio"
+                      >
+                        <Package className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Plano</span>
+                      </button>
+
+                      <button
+                        onClick={() => onEditAR(ar)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        title="Editar todos os campos deste AR"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => onDeleteAR(ar.id)}
+                        className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-950/40 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        title="Excluir este AR"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            };
+
+            const tableHeader = (
               <thead>
                 <tr className="border-b border-slate-800 text-slate-400 font-bold uppercase text-[10px] tracking-wider bg-slate-950/60">
                   <th className="py-3 px-3">Código AR</th>
-                  <th className="py-3 px-3">Furo</th>
+                  <th className="py-3 px-3">Furo / Tipo</th>
                   <th className="py-3 px-3">Faixa de Amostras</th>
                   <th className="py-3 px-3 text-center">Amostras</th>
                   <th className="py-3 px-3 text-center">Volumes</th>
@@ -655,222 +917,86 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                   <th className="py-3 px-3 text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-medium">
-                {filteredARs.map((ar) => (
-                  <tr key={ar.id} className="hover:bg-slate-800/40 transition-colors">
-                    {/* AR Code */}
-                    <td className="py-3.5 px-3">
-                      <span className="font-mono font-black text-cyan-300 px-2.5 py-1 rounded bg-cyan-950/80 border border-cyan-800 text-xs">
-                        {ar.arCode}
-                      </span>
-                    </td>
+            );
 
-                    {/* Hole Code */}
-                    <td className="py-3.5 px-3">
-                      <button
-                        onClick={() => onOpenHoleDetailByCode(ar.drillHoleCode)}
-                        className="font-mono font-bold text-white hover:text-amber-400 hover:underline transition-colors"
-                        title="Clique para ver o histórico do furo"
-                      >
-                        {ar.drillHoleCode}
-                      </button>
-                    </td>
-
-                    {/* Sample Range */}
-                    <td className="py-3.5 px-3">
-                      <div className="flex flex-col gap-1">
-                        {getNormalizedSampleRanges(ar.sampleRanges, ar.startSampleCode, ar.endSampleCode).map((r, idx) => (
-                          <span key={idx} className="font-mono font-semibold text-slate-200 bg-slate-800 px-2 py-1 rounded border border-slate-700 text-[11px] whitespace-nowrap">
-                            {r.firstSampleCode} a {r.lastSampleCode}
-                          </span>
-                        ))}
+            return (
+              <>
+                {/* Mobile AR Cards View */}
+                <div className="block md:hidden space-y-4">
+                  {regularARs.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between px-1 mb-1">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                          <Truck className="w-4 h-4 text-cyan-400" />
+                          <span>Relação de ARs ({regularARs.length})</span>
+                        </h3>
+                        <span className="text-[10px] text-slate-500 font-mono">Sequencial ativo</span>
                       </div>
-                    </td>
+                      {regularARs.map(renderArMobileCard)}
+                    </div>
+                  )}
 
-                    {/* Sample Count */}
-                    <td className="py-3.5 px-3 text-center font-mono font-black text-emerald-400">
-                      {ar.sampleCount}
-                      {ar.sampleCount > 200 && (
-                        <span className="text-[9px] text-red-400 block font-normal">
-                          ! &gt; 200
+                  {reenvioARs.length > 0 && (
+                    <div className="space-y-3 p-3 rounded-2xl bg-purple-950/15 border border-purple-500/30">
+                      <div className="flex items-center justify-between px-1">
+                        <h3 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-purple-400" />
+                          <span>Reenvio / Reanálise ({reenvioARs.length})</span>
+                        </h3>
+                        <span className="text-[10px] text-purple-300/80 font-mono">Grupo próprio</span>
+                      </div>
+                      {reenvioARs.map(renderArMobileCard)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:flex flex-col gap-6">
+                  {regularARs.length > 0 && (
+                    <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg overflow-x-auto">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                          <Truck className="w-4 h-4 text-cyan-400" />
+                          Relação Sequencial de Envio de Amostras ({regularARs.length} registros)
+                        </h3>
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          Regra: Máximo de 200 amostras por lote/AR • Todos os campos editáveis
                         </span>
-                      )}
-                    </td>
-
-                    {/* Volumes */}
-                    <td className="py-3.5 px-3 text-center font-mono text-slate-300">
-                      {getARVolumeCount(ar)} vol.
-                    </td>
-
-                    {/* Weight (Inline Editable) */}
-                    <td className="py-3.5 px-3 text-center">
-                      {editingWeightArId === ar.id ? (
-                        <div className="inline-flex items-center gap-1.5 justify-center bg-slate-950 px-2 py-1 rounded-xl border border-purple-500 shadow-lg shadow-purple-950/40">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoFocus
-                            value={editingWeightValue}
-                            onChange={(e) => setEditingWeightValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleSaveWeight(ar);
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                handleCancelEditWeight();
-                              }
-                            }}
-                            placeholder="0.0"
-                            className="w-16 px-1.5 py-1 text-xs text-center font-mono font-bold bg-slate-900 text-purple-200 rounded-lg border border-slate-700 focus:outline-none focus:border-purple-400"
-                          />
-                          <span className="text-[10px] text-slate-400 font-mono font-semibold">kg</span>
-                          <button
-                            type="button"
-                            disabled={isSavingWeight}
-                            onClick={() => handleSaveWeight(ar)}
-                            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
-                            title="Salvar peso (Enter)"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isSavingWeight}
-                            onClick={handleCancelEditWeight}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
-                            title="Cancelar (Esc)"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleStartEditWeight(ar)}
-                          className="group inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-purple-950/40 border border-transparent hover:border-purple-800/60 transition-all cursor-pointer font-mono text-xs"
-                          title="Clique para editar o peso diretamente"
-                        >
-                          {ar.weightKg !== undefined && ar.weightKg !== null && ar.weightKg > 0 ? (
-                            <>
-                              <span className="text-purple-300 font-bold group-hover:text-purple-200">{ar.weightKg} kg</span>
-                              <Edit2 className="w-3 h-3 text-purple-400/50 group-hover:text-purple-300 transition-colors" />
-                            </>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 group-hover:text-purple-300 bg-slate-800/50 group-hover:bg-purple-950/50 px-2 py-0.5 rounded-md border border-dashed border-slate-700 group-hover:border-purple-600 transition-all">
-                              <Scale className="w-3 h-3 text-purple-400" />
-                              <span>Inserir peso</span>
-                            </span>
-                          )}
-                        </button>
-                      )}
-                    </td>
-
-                    {/* QA/QC Standard Samples */}
-                    <td className="py-2 px-3">
-                      <QaqcTableGrid
-                        samples={ar.qaqcSamples || []}
-                        arId={ar.id}
-                        onUpdateDuplicateMeter={handleUpdateDuplicateMeterInternal}
-                      />
-                    </td>
-
-                    {/* Date (Inline Editable) */}
-                    <td className="py-3.5 px-3">
-                      {editingDateArId === ar.id ? (
-                        <div className="inline-flex items-center gap-1.5 justify-center bg-slate-950 px-2 py-1 rounded-xl border border-cyan-500 shadow-lg shadow-cyan-950/40">
-                          <input
-                            type="date"
-                            autoFocus
-                            value={editingDateValue}
-                            onChange={(e) => setEditingDateValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleSaveDate(ar);
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                handleCancelEditDate();
-                              }
-                            }}
-                            className="px-2 py-1 text-xs font-mono font-bold bg-slate-900 text-cyan-200 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-400 cursor-pointer"
-                          />
-                          <button
-                            type="button"
-                            disabled={isSavingDate || !editingDateValue}
-                            onClick={() => handleSaveDate(ar)}
-                            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
-                            title="Salvar data de envio (Enter)"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isSavingDate}
-                            onClick={handleCancelEditDate}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
-                            title="Cancelar (Esc)"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleStartEditDate(ar)}
-                          className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-cyan-950/40 border border-transparent hover:border-cyan-800/60 transition-all cursor-pointer font-mono text-xs text-slate-300 hover:text-cyan-200"
-                          title="Clique para editar a data de envio diretamente"
-                        >
-                          <Calendar className="w-3.5 h-3.5 text-cyan-400/70 group-hover:text-cyan-300 transition-colors" />
-                          <span className="font-medium">{formatDateToPtBR(ar.shipmentDate) || 'Definir data'}</span>
-                          <Edit2 className="w-3 h-3 text-cyan-400/40 group-hover:text-cyan-300 transition-colors ml-0.5" />
-                        </button>
-                      )}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="py-3.5 px-3 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => onOpenPackingPlan(ar, 'photos')}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-bold text-[11px] flex items-center gap-1 transition-all min-h-[36px]"
-                          title="Tirar e visualizar fotos dos padrões QA/QC deste AR"
-                        >
-                          <Camera className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{photos.filter((p) => isPhotoMatchingAR(p, ar)).length} Fotos</span>
-                        </button>
-
-                        <button
-                          onClick={() => onOpenPackingPlan(ar, 'plan')}
-                          className="px-2.5 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 active:bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold text-[11px] flex items-center gap-1.5 transition-all shadow-xs min-h-[36px]"
-                          title="Gerar Plano de Empacotamento do Envio"
-                        >
-                          <Package className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>Plano</span>
-                        </button>
-
-                        <button
-                          onClick={() => onEditAR(ar)}
-                          className="p-2 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
-                          title="Editar todos os campos deste AR"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          onClick={() => onDeleteAR(ar.id)}
-                          className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-950/40 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
-                          title="Excluir este AR"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+                      <table className="w-full text-left text-xs border-collapse min-w-[850px]">
+                        {tableHeader}
+                        <tbody className="divide-y divide-slate-800/60 font-medium">
+                          {regularARs.map(renderArTableRow)}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {reenvioARs.length > 0 && (
+                    <div className="p-6 rounded-2xl bg-slate-900 border border-purple-500/40 shadow-lg overflow-x-auto">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
+                          Reenvio / Reanálise ({reenvioARs.length} {reenvioARs.length === 1 ? 'remessa' : 'remessas'})
+                        </h3>
+                        <span className="text-[11px] text-purple-300/80 font-mono">
+                          Grupo próprio de remessas de reenvio e reanálise
+                        </span>
+                      </div>
+
+                      <table className="w-full text-left text-xs border-collapse min-w-[850px]">
+                        {tableHeader}
+                        <tbody className="divide-y divide-slate-800/60 font-medium">
+                          {reenvioARs.map(renderArTableRow)}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </>
       )}
         </>

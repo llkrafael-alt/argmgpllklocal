@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DrillHole, ProductionLog, StageId, User } from '../types';
 import { getApplicableStages, getStageById } from '../constants/stages';
+import { getHoleTypeLabel } from '../constants/holeTypes';
 import { checkOverlap, calculateStageProgress } from '../utils/calculator';
 import { AlertTriangle, CheckCircle2, X, PlusCircle, UserCheck } from 'lucide-react';
 
@@ -25,7 +26,9 @@ export const LogProductionModal: React.FC<LogProductionModalProps> = ({
   initialHoleId,
   initialStageId,
 }) => {
-  const activeHoles = holes.filter((h) => !h.completedAt && h.holeType !== 'Solo' && h.holeType !== 'Trincheira');
+  const activeHoles = holes.filter(
+    (h) => !h.completedAt && h.holeType !== 'Solo' && h.holeType !== 'Trincheira' && h.holeType !== 'Reenvio'
+  );
   const selectedHoleObj = activeHoles.find((h) => h.id === (initialHoleId || activeHoles[0]?.id)) || activeHoles[0];
 
   const [holeId, setHoleId] = useState<string>(selectedHoleObj?.id || '');
@@ -110,7 +113,7 @@ export const LogProductionModal: React.FC<LogProductionModalProps> = ({
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full text-center">
           <p className="text-slate-300 mb-4">
-            Nenhum furo de Diamantado ou RC ativo encontrado para realizar apontamentos. Furos do tipo Solo e Trincheira não possuem lançamento de etapas.
+            Nenhum furo de Diamantado ou RC ativo encontrado para realizar apontamentos. Furos dos tipos Solo, Trincheira e Reenvio/Reanálise não possuem lançamento de etapas.
           </p>
           <button
             onClick={onClose}
@@ -246,7 +249,7 @@ export const LogProductionModal: React.FC<LogProductionModalProps> = ({
             >
               {activeHoles.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.code} [{h.holeType === 'RC' ? 'RC' : 'Diamantado'}] ({h.target}) — {h.startMeter}m a {h.endMeter}m
+                  {h.code} [{getHoleTypeLabel(h.holeType)}] ({h.target}) — {h.startMeter}m a {h.endMeter}m
                 </option>
               ))}
             </select>

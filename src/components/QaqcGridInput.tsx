@@ -37,6 +37,9 @@ interface QaqcGridInputProps {
   ars?: SampleShipmentAR[];
   currentArId?: string;
   resetKey?: string | number;
+  codeErrorsById?: Record<string, string>;
+  codeValidationMessages?: string[];
+  expectedLetterHint?: string;
 }
 
 const generateId = () => `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -118,7 +121,12 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
   ars = [],
   currentArId,
   resetKey,
+  codeErrorsById,
+  codeValidationMessages = [],
+  expectedLetterHint,
 }) => {
+  const samplePrefixPlaceholder =
+    expectedLetterHint && expectedLetterHint.length === 1 ? expectedLetterHint : 'R';
   // 3 independent row states for each column, initialized with 10 rows each
   const [oreasRows, setOreasRows] = useState<OreasRow[]>(() => buildInitialRows(initialSamples).oreas);
   const [blkRows, setBlkRows] = useState<SingleRow[]>(() => buildInitialRows(initialSamples).blk);
@@ -712,6 +720,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
         {oreasRows.map((row, idx) => {
           const lotKey = row.lot.trim().toUpperCase();
           const isFilled = row.code.trim() !== '';
+          const codeError = isFilled && codeErrorsById ? codeErrorsById[row.id] : undefined;
           const stockInfo = lotKey
             ? getAvailableStockForCode(row.lot.trim(), oreasStockEntries, ars, currentArId)
             : null;
@@ -722,7 +731,11 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
             <div
               key={row.id}
               className={`flex items-center gap-2 px-3 py-2 transition-colors ${
-                isFilled ? 'bg-purple-950/25 border-b border-purple-900/20' : 'hover:bg-slate-800/40'
+                codeError
+                  ? 'bg-red-950/35 border-b border-red-900/50'
+                  : isFilled
+                  ? 'bg-purple-950/25 border-b border-purple-900/20'
+                  : 'hover:bg-slate-800/40'
               }`}
             >
               {/* Row Index */}
@@ -737,14 +750,22 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
                     oreasCodeRefs.current[idx] = el;
                   }}
                   type="text"
-                  placeholder="Ex: R09415"
+                  placeholder={`Ex: ${samplePrefixPlaceholder}09415`}
                   value={row.code}
                   onFocus={() => setLastFocusedOreasIndex(idx)}
                   onChange={(e) => handleOreasChange(idx, 'code', e.target.value)}
+                  onBlur={(e) => {
+                    const trimmed = e.target.value.trim().toUpperCase();
+                    if (trimmed !== row.code) handleOreasChange(idx, 'code', trimmed);
+                  }}
                   onKeyDown={(e) => handleOreasKeyDown(e, idx, 'code')}
                   onPaste={(e) => handleOreasPaste(e, idx, 'code')}
+                  title={codeError || undefined}
+                  aria-invalid={Boolean(codeError)}
                   className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
-                    isFilled
+                    codeError
+                      ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
+                      : isFilled
                       ? 'border-purple-500/70 bg-purple-950/40 text-purple-100 focus:border-purple-400 focus:ring-1 focus:ring-purple-400/30'
                       : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-purple-500'
                   }`}
@@ -900,12 +921,17 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
       <div className="flex flex-col divide-y divide-slate-800/80 max-h-[420px] overflow-y-auto">
         {blkRows.map((row, idx) => {
           const isFilled = row.code.trim() !== '';
+          const codeError = isFilled && codeErrorsById ? codeErrorsById[row.id] : undefined;
 
           return (
             <div
               key={row.id}
               className={`flex items-center gap-2 px-3 py-2 transition-colors ${
-                isFilled ? 'bg-amber-950/25 border-b border-amber-900/20' : 'hover:bg-slate-800/40'
+                codeError
+                  ? 'bg-red-950/35 border-b border-red-900/50'
+                  : isFilled
+                  ? 'bg-amber-950/25 border-b border-amber-900/20'
+                  : 'hover:bg-slate-800/40'
               }`}
             >
               {/* Row Index */}
@@ -920,13 +946,21 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
                     blkCodeRefs.current[idx] = el;
                   }}
                   type="text"
-                  placeholder="Ex: R09400"
+                  placeholder={`Ex: ${samplePrefixPlaceholder}09400`}
                   value={row.code}
                   onChange={(e) => handleBlkChange(idx, e.target.value)}
+                  onBlur={(e) => {
+                    const trimmed = e.target.value.trim().toUpperCase();
+                    if (trimmed !== row.code) handleBlkChange(idx, trimmed);
+                  }}
                   onKeyDown={(e) => handleBlkKeyDown(e, idx)}
                   onPaste={(e) => handleBlkPaste(e, idx)}
+                  title={codeError || undefined}
+                  aria-invalid={Boolean(codeError)}
                   className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
-                    isFilled
+                    codeError
+                      ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
+                      : isFilled
                       ? 'border-amber-500/70 bg-amber-950/40 text-amber-100 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30'
                       : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-amber-500'
                   }`}
@@ -1031,12 +1065,17 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
       <div className="flex flex-col divide-y divide-slate-800/80 max-h-[420px] overflow-y-auto">
         {dupRows.map((row, idx) => {
           const isFilled = row.code.trim() !== '';
+          const codeError = isFilled && codeErrorsById ? codeErrorsById[row.id] : undefined;
 
           return (
             <div
               key={row.id}
               className={`flex items-center gap-2 px-3 py-2 transition-colors ${
-                isFilled ? 'bg-cyan-950/25 border-b border-cyan-900/20' : 'hover:bg-slate-800/40'
+                codeError
+                  ? 'bg-red-950/35 border-b border-red-900/50'
+                  : isFilled
+                  ? 'bg-cyan-950/25 border-b border-cyan-900/20'
+                  : 'hover:bg-slate-800/40'
               }`}
             >
               {/* Row Index */}
@@ -1051,13 +1090,21 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
                     dupCodeRefs.current[idx] = el;
                   }}
                   type="text"
-                  placeholder="Ex: R09420"
+                  placeholder={`Ex: ${samplePrefixPlaceholder}09420`}
                   value={row.code}
                   onChange={(e) => handleDupChange(idx, 'code', e.target.value)}
+                  onBlur={(e) => {
+                    const trimmed = e.target.value.trim().toUpperCase();
+                    if (trimmed !== row.code) handleDupChange(idx, 'code', trimmed);
+                  }}
                   onKeyDown={(e) => handleDupKeyDown(e, idx, 'code')}
                   onPaste={(e) => handleDupPaste(e, idx, 'code')}
+                  title={codeError || undefined}
+                  aria-invalid={Boolean(codeError)}
                   className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
-                    isFilled
+                    codeError
+                      ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
+                      : isFilled
                       ? 'border-cyan-500/70 bg-cyan-950/40 text-cyan-100 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30'
                       : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500'
                   }`}
@@ -1277,6 +1324,21 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
         renderBlkColumn(true)
       ) : (
         renderDupColumn(true)
+      )}
+
+      {/* Validation error banner for invalid QA/QC starting letters */}
+      {codeValidationMessages.length > 0 && (
+        <div className="p-3 rounded-xl bg-red-950/80 border border-red-700/80 text-red-200 text-xs flex flex-col gap-1">
+          <div className="font-bold flex items-center gap-2 text-red-300">
+            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            <span>Erro nos códigos QA/QC (letra incompatível):</span>
+          </div>
+          <ul className="list-disc list-inside space-y-0.5 pl-1 text-[11px] text-red-200">
+            {codeValidationMessages.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {/* Stock summary warning if any OREAS lot is overdrawn */}

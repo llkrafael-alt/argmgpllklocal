@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, DrillHole, SampleShipmentAR, OreasStockEntry, QaQcSample, SampleRange, QAQCSamplePhoto, ProductionLog } from './types';
+import { User, DrillHole, HoleType, SampleShipmentAR, OreasStockEntry, QaQcSample, SampleRange, QAQCSamplePhoto, ProductionLog } from './types';
+import { getHoleTypeLabel, isValidHoleType } from './constants/holeTypes';
 import { loadActiveUserId, saveActiveUserId } from './utils/storage';
 import {
   subscribeUsers,
@@ -365,6 +366,7 @@ export default function App() {
   // Hole / Sample Registration with Automatic AR Generation
   const handleCreateHole = async (holeData: {
     code: string;
+    holeType: HoleType;
     target?: string;
     firstSampleCode: string;
     lastSampleCode: string;
@@ -381,6 +383,7 @@ export default function App() {
       const newHole: DrillHole = {
         id: newHoleId,
         code: holeData.code,
+        holeType: holeData.holeType,
         target: holeData.target || 'GERAL',
         firstSampleCode: holeData.firstSampleCode,
         lastSampleCode: holeData.lastSampleCode,
@@ -401,7 +404,7 @@ export default function App() {
 
       // Generate Automatic AR(s) based on sample count
       const autoARs = generateARsForSampleRange(
-        { id: newHoleId, code: holeData.code },
+        { id: newHoleId, code: holeData.code, holeType: holeData.holeType },
         holeData.firstSampleCode,
         holeData.lastSampleCode,
         ars,
@@ -420,6 +423,7 @@ export default function App() {
       for (const ar of autoARs) {
         const newAR: SampleShipmentAR = {
           ...ar,
+          holeType: holeData.holeType,
           id: `ar_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
           createdAt: new Date().toISOString(),
         };
@@ -429,13 +433,13 @@ export default function App() {
       // Log hole creation activity
       await logUserActivity(
         'HOLE_CREATED',
-        `Cadastro do Furo ${newHole.code}`,
+        `Cadastro do Furo ${newHole.code} (${getHoleTypeLabel(newHole.holeType)})`,
         newHole.id,
-        `Alvo: ${newHole.target || 'GERAL'} • ${newHole.calculatedSampleCount || 0} amostras planejadas • ${autoARs.length} AR(s) gerada(s).`
+        `Tipo: ${getHoleTypeLabel(newHole.holeType)} • Alvo: ${newHole.target || 'GERAL'} • ${newHole.calculatedSampleCount || 0} amostras planejadas • ${autoARs.length} AR(s) gerada(s).`
       );
 
       triggerToast(
-        `Furo ${newHole.code} cadastrado! Criado(s) ${autoARs.length} AR(s) com os padrões e dados de envio.`
+        `Furo ${newHole.code} (${getHoleTypeLabel(newHole.holeType)}) cadastrado! Criado(s) ${autoARs.length} AR(s).`
       );
     } catch (err: any) {
       console.error('Erro ao cadastrar furo:', err);
@@ -860,6 +864,7 @@ export default function App() {
           ...singleAR,
           drillHoleId: holeId,
           drillHoleCode: targetHole.code,
+          ...(targetHole.holeType ? { holeType: targetHole.holeType } : {}),
           startSampleCode: cleanFirst,
           endSampleCode: cleanLast,
           sampleRanges: normalizedRanges,
@@ -930,7 +935,12 @@ export default function App() {
     }
   };
 
-  const handleUpdateHoleInfo = async (holeId: string, newCode: string, newTarget?: string) => {
+  const handleUpdateHoleInfo = async (
+    holeId: string,
+    newCode: string,
+    newTarget?: string,
+    newHoleType?: HoleType | ''
+  ) => {
     try {
       const targetHole = holes.find((h) => h.id === holeId);
       if (!targetHole) return;
@@ -943,28 +953,52 @@ export default function App() {
         return;
       }
 
+      const resolvedHoleType: HoleType | undefined =
+        newHoleType === ''
+          ? undefined
+          : newHoleType !== undefined && isValidHoleType(newHoleType)
+          ? newHoleType
+          : targetHole.holeType;
+
       const updatedHole: DrillHole = {
         ...targetHole,
         code: trimmedCode,
         target: trimmedTarget,
       };
+      if (resolvedHoleType) {
+        updatedHole.holeType = resolvedHoleType;
+      } else {
+        delete updatedHole.holeType;
+      }
 
       setHoles((prev) => prev.map((h) => (h.id === holeId ? updatedHole : h)));
       await saveHoleToDb(updatedHole);
 
-      // Also update drillHoleCode in all linked ARs
+      // Also update drillHoleCode & holeType in all linked ARs
       const relatedARs = ars.filter((ar) => ar.drillHoleId === holeId);
       if (relatedARs.length > 0) {
         setARs((prev) =>
-          prev.map((a) => (a.drillHoleId === holeId ? { ...a, drillHoleCode: trimmedCode } : a))
+          prev.map((a) => {
+            if (a.drillHoleId !== holeId) return a;
+            const nextAr: SampleShipmentAR = { ...a, drillHoleCode: trimmedCode };
+            if (resolvedHoleType) {
+              nextAr.holeType = resolvedHoleType;
+            } else {
+              delete nextAr.holeType;
+            }
+            return nextAr;
+          })
         );
       }
       for (const ar of relatedARs) {
-        if (ar.drillHoleCode !== trimmedCode) {
-          await saveARToDb({
-            ...ar,
-            drillHoleCode: trimmedCode,
-          });
+        if (ar.drillHoleCode !== trimmedCode || ar.holeType !== resolvedHoleType) {
+          const nextAr: SampleShipmentAR = { ...ar, drillHoleCode: trimmedCode };
+          if (resolvedHoleType) {
+            nextAr.holeType = resolvedHoleType;
+          } else {
+            delete nextAr.holeType;
+          }
+          await saveARToDb(nextAr);
         }
       }
 
@@ -972,10 +1006,10 @@ export default function App() {
         'HOLE_UPDATED',
         `Edição do Furo ${trimmedCode}`,
         holeId,
-        `Código: ${trimmedCode} • Alvo: ${trimmedTarget}`
+        `Código: ${trimmedCode} • Alvo: ${trimmedTarget} • Tipo: ${getHoleTypeLabel(resolvedHoleType)}`
       );
 
-      triggerToast('Nome do furo e alvo atualizados com sucesso!');
+      triggerToast('Dados do furo atualizados com sucesso!');
     } catch (err: any) {
       console.error('Erro ao atualizar informações do furo:', err);
       triggerToast(`Erro ao atualizar no banco: ${err?.message || 'Falha na conexão'}`);

@@ -1,6 +1,7 @@
 import {
   ProductionLog,
   DrillHole,
+  HoleType,
   StageId,
   StageProgress,
   HoleProgressSummary,
@@ -756,7 +757,7 @@ export function getARVolumeCount(ar: {
  * Initial volumes, weight, and shipmentDate are left blank/0 for later editing.
  */
 export function generateARsForSampleRange(
-  hole: { id: string; code: string },
+  hole: { id: string; code: string; holeType?: HoleType },
   firstCode: string,
   lastCode: string,
   existingARs: { arCode: string }[],
@@ -797,6 +798,7 @@ export function generateARsForSampleRange(
       arCode,
       drillHoleId: hole.id,
       drillHoleCode: hole.code,
+      ...(hole.holeType ? { holeType: hole.holeType } : {}),
       startSampleCode: startCode,
       endSampleCode: endCode,
       sampleRanges: normalizedRanges,
@@ -838,6 +840,7 @@ export function generateARsForSampleRange(
     arCode: string;
     drillHoleId: string;
     drillHoleCode: string;
+    holeType?: HoleType;
     startSampleCode: string;
     endSampleCode: string;
     sampleRanges?: SampleRange[];
@@ -896,6 +899,7 @@ export function generateARsForSampleRange(
       arCode,
       drillHoleId: hole.id,
       drillHoleCode: hole.code,
+      ...(hole.holeType ? { holeType: hole.holeType } : {}),
       startSampleCode: arStartCode,
       endSampleCode: arEndCode,
       sampleRanges: arRange,

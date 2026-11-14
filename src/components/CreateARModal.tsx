@@ -1,7 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DrillHole, SampleShipmentAR, User, QaQcSample, OreasStockEntry, SampleRange } from '../types';
 import { parseSampleRange, parseSampleCodeDetails, getNextArCode, generatePackingPlan, getArCodeDisplay } from '../utils/calculator';
 import { getAvailableStockForCode, getSampleOreasProduct } from '../utils/oreasStock';
+import {
+  HOLE_TYPE_CONFIG,
+  getHoleTypeBadgeClass,
+  getHoleTypeLabel,
+  isValidHoleType,
+  normalizeSampleCode,
+  validateSampleRangesForHoleType,
+  validateQaqcSamplesForHoleType,
+} from '../constants/holeTypes';
 import { QaqcGridInput } from './QaqcGridInput';
 import {
   Truck,
@@ -186,6 +195,26 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
   const [qaqcSamples, setQaqcSamples] = useState<QaQcSample[]>(() => initialResolvedQaqc.effectiveSamples);
 
   const currentHole = holes.find((h) => h.id === holeId) || selectedHoleObj;
+  const effectiveHoleType =
+    (currentHole && isValidHoleType(currentHole.holeType) ? currentHole.holeType : undefined) ||
+    (arToEdit && isValidHoleType(arToEdit.holeType) ? arToEdit.holeType : undefined);
+
+  const arSampleRangeList = useMemo<SampleRange[]>(
+    () => [{ firstSampleCode: startSampleCode, lastSampleCode: endSampleCode }],
+    [startSampleCode, endSampleCode]
+  );
+
+  const rangeLetterValidation = useMemo(
+    () => validateSampleRangesForHoleType(arSampleRangeList, effectiveHoleType),
+    [arSampleRangeList, effectiveHoleType]
+  );
+
+  const qaqcLetterValidation = useMemo(
+    () => validateQaqcSamplesForHoleType(qaqcSamples, arSampleRangeList, effectiveHoleType),
+    [qaqcSamples, arSampleRangeList, effectiveHoleType]
+  );
+
+  const hasRealTimeLetterErrors = !rangeLetterValidation.isValid || !qaqcLetterValidation.isValid;
 
   // On opening or editing change, set form fields
   useEffect(() => {
@@ -329,6 +358,21 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
       return;
     }
 
+    const cleanStartCode = normalizeSampleCode(startSampleCode);
+    const cleanEndCode = normalizeSampleCode(endSampleCode);
+    const normalizedRanges: SampleRange[] = [
+      {
+        firstSampleCode: cleanStartCode,
+        lastSampleCode: cleanEndCode,
+      },
+    ];
+
+    const submitRangeValidation = validateSampleRangesForHoleType(normalizedRanges, effectiveHoleType);
+    if (!submitRangeValidation.isValid) {
+      setErrorMsg(submitRangeValidation.messages[0]);
+      return;
+    }
+
     if (sampleCount <= 0) {
       setErrorMsg('A quantidade de amostras do AR deve ser maior que zero.');
       return;
@@ -341,19 +385,22 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
       return;
     }
 
-    // Filter out invalid empty QA/QC rows
-    const cleanedQaqc = qaqcSamples.filter((q) => q.code.trim() !== '');
+    // Filter out invalid empty QA/QC rows and normalize uppercase
+    const cleanedQaqc = qaqcSamples
+      .map((q) => ({ ...q, code: normalizeSampleCode(q.code) }))
+      .filter((q) => q.code !== '');
+
+    const submitQaqcValidation = validateQaqcSamplesForHoleType(
+      cleanedQaqc,
+      normalizedRanges,
+      effectiveHoleType
+    );
+    if (!submitQaqcValidation.isValid) {
+      setErrorMsg(submitQaqcValidation.messages[0]);
+      return;
+    }
 
     const numWeight = typeof weightKg === 'string' ? parseFloat(weightKg.replace(',', '.')) : weightKg;
-
-    const cleanStartCode = startSampleCode.trim().toUpperCase();
-    const cleanEndCode = endSampleCode.trim().toUpperCase();
-    const normalizedRanges: SampleRange[] = [
-      {
-        firstSampleCode: cleanStartCode,
-        lastSampleCode: cleanEndCode,
-      },
-    ];
 
     const effectiveStandardSize = arToEdit?.standardSize && arToEdit.standardSize > 0 ? arToEdit.standardSize : 10;
 
@@ -363,7 +410,7 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
       ? packingPlan.totalVolumes
       : Math.max(1, Math.ceil(sampleCount / effectiveStandardSize));
 
-    let finalArCode = arCode.trim().toUpperCase();
+    let finalArCode = normalizeSampleCode(arCode);
     if (!finalArCode || finalArCode === 'ARGMGP-' || finalArCode === 'ARGMGP' || /^[A-Z]+-?$/i.test(finalArCode)) {
       finalArCode = getNextArCode(ars.filter((a) => a.id !== arToEdit?.id));
     }
@@ -373,6 +420,7 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
         arCode: finalArCode,
         drillHoleId: currentHole.id,
         drillHoleCode: currentHole.code,
+        ...(effectiveHoleType ? { holeType: effectiveHoleType } : {}),
         startSampleCode: cleanStartCode,
         endSampleCode: cleanEndCode,
         sampleRanges: normalizedRanges,
@@ -421,10 +469,21 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
-          {errorMsg && (
-            <div className="p-3.5 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-medium flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-              <span>{errorMsg}</span>
+          {(errorMsg || hasRealTimeLetterErrors) && (
+            <div className="p-3.5 rounded-xl bg-red-950/80 border border-red-800 text-red-200 text-xs font-medium flex flex-col gap-1">
+              <div className="flex items-start gap-2 font-bold text-red-300">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <span>{errorMsg || 'Corrija os códigos incompatíveis com o tipo de furo:'}</span>
+              </div>
+              {hasRealTimeLetterErrors && (
+                <ul className="list-disc list-inside space-y-0.5 pl-1 text-[11px] text-red-200">
+                  {[...rangeLetterValidation.messages, ...qaqcLetterValidation.messages]
+                    .filter((m) => m !== errorMsg)
+                    .map((m, i) => (
+                      <li key={i}>{m}</li>
+                    ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -437,7 +496,8 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
               <input
                 type="text"
                 value={arCode}
-                onChange={(e) => setArCode(e.target.value)}
+                onChange={(e) => setArCode(e.target.value.toUpperCase())}
+                onBlur={(e) => setArCode(normalizeSampleCode(e.target.value))}
                 placeholder="Ex: ARGMGP-300"
                 className="px-3.5 py-2.5 rounded-xl border border-slate-700 bg-slate-800 font-mono text-cyan-300 font-bold text-sm outline-none focus:border-cyan-500"
               />
@@ -447,9 +507,14 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-300">
-                Furo de Sondagem
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-bold text-slate-300">
+                  Furo de Sondagem
+                </label>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getHoleTypeBadgeClass(effectiveHoleType)}`}>
+                  {getHoleTypeLabel(effectiveHoleType)}
+                </span>
+              </div>
               <select
                 value={holeId}
                 onChange={(e) => handleHoleChange(e.target.value)}
@@ -457,7 +522,7 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
               >
                 {holes.map((h) => (
                   <option key={h.id} value={h.id}>
-                    {h.code} ({h.target})
+                    {h.code} [{getHoleTypeLabel(h.holeType)}] ({h.target})
                   </option>
                 ))}
               </select>
@@ -466,9 +531,17 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
 
           {/* Sample Range Inputs */}
           <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700 flex flex-col gap-3">
-            <span className="text-xs font-bold text-slate-200">
-              Faixa de Amostras Incluída no AR
-            </span>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs font-bold text-slate-200">
+                Faixa de Amostras Incluída no AR
+              </span>
+              {effectiveHoleType && (
+                <span className="text-[11px] font-mono text-slate-400">
+                  Letra esperada ({HOLE_TYPE_CONFIG[effectiveHoleType].label}):{' '}
+                  <strong className="text-slate-200">{HOLE_TYPE_CONFIG[effectiveHoleType].letterHint}</strong>
+                </span>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -478,10 +551,24 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
                 <input
                   type="text"
                   value={startSampleCode}
-                  onChange={(e) => setStartSampleCode(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setErrorMsg('');
+                    setStartSampleCode(e.target.value.toUpperCase());
+                  }}
+                  onBlur={(e) => setStartSampleCode(normalizeSampleCode(e.target.value))}
                   placeholder="Ex: D01036"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 font-mono text-white text-xs font-bold outline-none focus:border-cyan-500"
+                  aria-invalid={Boolean(rangeLetterValidation.fieldErrors['0:first'])}
+                  className={`w-full px-3 py-2 rounded-lg border font-mono text-xs font-bold outline-none ${
+                    rangeLetterValidation.fieldErrors['0:first']
+                      ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400'
+                      : 'border-slate-700 bg-slate-900 text-white focus:border-cyan-500'
+                  }`}
                 />
+                {rangeLetterValidation.fieldErrors['0:first'] && (
+                  <p className="mt-1 text-[11px] text-red-300 font-medium">
+                    {rangeLetterValidation.fieldErrors['0:first']}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -491,10 +578,24 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
                 <input
                   type="text"
                   value={endSampleCode}
-                  onChange={(e) => setEndSampleCode(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setErrorMsg('');
+                    setEndSampleCode(e.target.value.toUpperCase());
+                  }}
+                  onBlur={(e) => setEndSampleCode(normalizeSampleCode(e.target.value))}
                   placeholder="Ex: D01135"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 font-mono text-white text-xs font-bold outline-none focus:border-cyan-500"
+                  aria-invalid={Boolean(rangeLetterValidation.fieldErrors['0:last'])}
+                  className={`w-full px-3 py-2 rounded-lg border font-mono text-xs font-bold outline-none ${
+                    rangeLetterValidation.fieldErrors['0:last']
+                      ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400'
+                      : 'border-slate-700 bg-slate-900 text-white focus:border-cyan-500'
+                  }`}
                 />
+                {rangeLetterValidation.fieldErrors['0:last'] && (
+                  <p className="mt-1 text-[11px] text-red-300 font-medium">
+                    {rangeLetterValidation.fieldErrors['0:last']}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -545,6 +646,15 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
               oreasStockEntries={oreasStockEntries}
               ars={ars}
               currentArId={arToEdit?.id}
+              codeErrorsById={qaqcLetterValidation.errorsById}
+              codeValidationMessages={qaqcLetterValidation.messages}
+              expectedLetterHint={
+                qaqcLetterValidation.expectedLetters.length === 1
+                  ? qaqcLetterValidation.expectedLetters[0]
+                  : effectiveHoleType
+                  ? HOLE_TYPE_CONFIG[effectiveHoleType].allowedLetters[0]
+                  : undefined
+              }
             />
           </div>
 
@@ -601,7 +711,12 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:bg-cyan-600 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+              disabled={hasRealTimeLetterErrors}
+              className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 ${
+                hasRealTimeLetterErrors
+                  ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                  : 'bg-cyan-500 hover:bg-cyan-400 active:bg-cyan-600 text-slate-950 shadow-lg shadow-cyan-500/20 cursor-pointer'
+              }`}
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{arToEdit ? 'Salvar Alterações no AR' : 'Confirmar Envio (AR)'}</span>

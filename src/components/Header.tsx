@@ -8,12 +8,8 @@ import {
   Box,
   UserCheck,
   RotateCcw,
-  LogOut,
   Truck,
-  Sun,
-  Moon,
   Edit3,
-  HardDrive,
   Folder,
   FolderCheck,
   Palette,
@@ -22,8 +18,6 @@ import {
 
 interface HeaderProps {
   activeUser: User;
-  onOpenAuthModal: () => void;
-  onLogout?: () => void;
   onOpenUserModal: () => void;
   onEditProfile?: () => void;
   onOpenNewHoleModal: () => void;
@@ -43,8 +37,6 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   activeUser,
-  onOpenAuthModal,
-  onLogout,
   onOpenUserModal,
   onEditProfile,
   onOpenNewHoleModal,
@@ -137,12 +129,13 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Login / Auth Account Button & Logout */}
+            {/* Active Operator Pill & Edit Profile */}
             <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-xl p-1">
               <button
-                onClick={onOpenAuthModal}
+                type="button"
+                onClick={onOpenUserModal}
                 className="px-2.5 py-1 rounded-lg hover:bg-slate-700/90 text-xs font-semibold flex items-center gap-2 transition-all group"
-                title="Clique para alternar operador ou ver detalhes da conta"
+                title="Clique para alternar operador ou gerenciar equipe"
               >
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                 <UserCheck className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
@@ -163,18 +156,6 @@ export const Header: React.FC<HeaderProps> = ({
                   title={`Editar nome / perfil de ${activeUser.name}`}
                 >
                   <Edit3 className="w-3.5 h-3.5" />
-                </button>
-              )}
-
-              {/* Logout / Sair Button */}
-              {onLogout && (
-                <button
-                  onClick={onLogout}
-                  className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 transition-colors text-xs font-bold flex items-center gap-1"
-                  title="Sair do sistema e voltar para a tela de login"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Sair</span>
                 </button>
               )}
             </div>

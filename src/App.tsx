@@ -49,7 +49,6 @@ import { NewHoleModal } from './components/NewHoleModal';
 import { CreateARModal } from './components/CreateARModal';
 import { OreasStockModal } from './components/OreasStockModal';
 import { UserManagementModal } from './components/UserManagementModal';
-import { AuthModal } from './components/AuthModal';
 import { HoleDetailModal } from './components/HoleDetailModal';
 import { DeleteHoleModal } from './components/DeleteHoleModal';
 import { DeleteUserModal } from './components/DeleteUserModal';
@@ -60,7 +59,7 @@ import { LocalDataModal } from './components/LocalDataModal';
 import { ThemeSelectorModal } from './components/ThemeSelectorModal';
 import { MobilePhotoSyncModal } from './components/MobilePhotoSyncModal';
 import { AppThemeId, THEME_OPTIONS } from './types/themes';
-import { CheckCircle2, Loader2, Sun, Moon } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 
 export default function App() {
   const [users, setUsers] = useState<User[]>(() => {
@@ -88,9 +87,6 @@ export default function App() {
   const [activeUserId, setActiveUserId] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(() => {
     return getLocalCachedUsers().length === 0 && getLocalCachedHoles().length === 0;
-  });
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem('argmgp_authenticated') === 'true';
   });
 
   // Theme state supporting 7 specialized themes
@@ -140,7 +136,6 @@ export default function App() {
   const [isNewHoleModalOpen, setIsNewHoleModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUserIdForModal, setEditingUserIdForModal] = useState<string | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLocalDataModalOpen, setIsLocalDataModalOpen] = useState(false);
   const [isMobilePhotoModalOpen, setIsMobilePhotoModalOpen] = useState(false);
   const [mobilePhotoHoleId, setMobilePhotoHoleId] = useState<string | undefined>();
@@ -244,23 +239,6 @@ export default function App() {
     name: 'Operador',
     role: 'Geólogo',
     createdAt: new Date().toISOString(),
-  };
-
-  // Auth Handlers
-  const handleLoginSuccess = (user: User) => {
-    setActiveUserId(user.id);
-    saveActiveUserId(user.id);
-    setIsAuthenticated(true);
-    sessionStorage.setItem('argmgp_authenticated', 'true');
-    triggerToast(`Acesso liberado! Bem-vindo(a), ${user.name} (${user.role}).`);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    sessionStorage.removeItem('argmgp_authenticated');
-    saveActiveUserId('');
-    setActiveUserId('');
-    triggerToast('Sessão encerrada com sucesso. Faça login para continuar.');
   };
 
   // User Handlers
@@ -1125,70 +1103,6 @@ export default function App() {
     );
   }
 
-  // Render Mandatory Login Screen if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col justify-between selection:bg-amber-500 selection:text-slate-950">
-        {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 animate-bounce bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-amber-500/40 flex items-center gap-2.5 text-xs font-bold">
-            <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
-        <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-amber-500 flex items-center justify-center text-slate-950 shadow-md font-black">
-              <span className="text-xl">📦</span>
-            </div>
-            <div>
-              <h1 className="text-lg font-black tracking-tight text-white font-mono uppercase">
-                ARGMGP - GESTÃO DE REMESSAS & QA/QC
-              </h1>
-              <p className="text-xs text-amber-400 font-medium">
-                Controle de Remessas, Estoque OREAS e Planos de Empacotamento
-              </p>
-            </div>
-          </div>
-
-          {/* Theme Toggle Button on Login Screen */}
-          <button
-            onClick={handleToggleTheme}
-            className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-            title={theme === 'dark' ? 'Alternar para Tema Branco Gelo (Claro)' : 'Alternar para Tema Escuro Titânio'}
-          >
-            {theme === 'dark' ? (
-              <>
-                <Sun className="w-4 h-4 text-amber-400" />
-                <span className="hidden sm:inline">Branco Gelo</span>
-              </>
-            ) : (
-              <>
-                <Moon className="w-4 h-4 text-cyan-400" />
-                <span className="hidden sm:inline">Escuro Titânio</span>
-              </>
-            )}
-          </button>
-        </header>
-
-        <div className="flex-1 flex items-center justify-center p-4">
-          <AuthModal
-            isOpen={true}
-            isMandatory={true}
-            onClose={() => {}}
-            users={users}
-            onLoginSuccess={handleLoginSuccess}
-            onUpdateUser={handleUpdateUser}
-          />
-        </div>
-
-        <footer className="py-4 text-center text-xs text-slate-500 border-t border-slate-900">
-          ARGMGP • Sistema Dedicado de Gestão de Remessas e Padrões de QA/QC
-        </footer>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-slate-950">
       {/* Toast Notification */}
@@ -1202,8 +1116,6 @@ export default function App() {
       {/* Main App Header */}
       <Header
         activeUser={activeUser}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        onLogout={handleLogout}
         onOpenUserModal={() => {
           setEditingUserIdForModal(null);
           setIsUserModalOpen(true);
@@ -1351,14 +1263,6 @@ export default function App() {
         onAddUser={handleAddUser}
         onUpdateUser={handleUpdateUser}
         onDeleteUserRequest={(u) => setUserToDelete(u)}
-      />
-
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        users={users}
-        onLoginSuccess={handleLoginSuccess}
-        onUpdateUser={handleUpdateUser}
       />
 
       <HoleDetailModal

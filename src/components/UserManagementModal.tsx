@@ -160,7 +160,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   };
 
   const isEditingSelf = editingUserId === activeUser.id;
-  const canAccess = isMaster || isEditingSelf;
+  const canEditTarget = isMaster || isEditingSelf;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 overflow-y-auto">
@@ -173,15 +173,15 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-base text-white flex items-center gap-2">
-                {editingUserId ? 'Editar Perfil do Usuário' : 'Gestão Central de Usuários'}
+                {editingUserId ? 'Editar Perfil do Usuário' : 'Operadores & Equipe'}
                 <span className="text-[10px] font-mono uppercase font-black px-2 py-0.5 rounded bg-amber-500 text-slate-950">
-                  {isMaster ? 'Master' : 'Perfil'}
+                  {isMaster ? 'Master' : 'Operador'}
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400">
                 {editingUserId
-                  ? 'Atualize seu nome, credenciais e configurações de acesso'
-                  : 'Controle de Acesso & Contas de Colaboradores'}
+                  ? 'Atualize nome, função e informações do operador'
+                  : 'Selecione o operador ativo ou gerencie membros da equipe'}
               </p>
             </div>
           </div>
@@ -195,8 +195,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         </div>
 
         <div className="p-6 flex flex-col gap-5">
-          {!canAccess ? (
-            /* ACCESS DENIED FOR NON-MASTER */
+          {editingUserId && !canEditTarget ? (
             <div className="p-6 rounded-2xl bg-amber-950/20 border border-amber-900/50 flex flex-col items-center text-center gap-3">
               <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
                 <Lock className="w-6 h-6" />
@@ -206,18 +205,18 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   Acesso Restrito ao Administrador Master
                 </h4>
                 <p className="text-xs text-slate-300 mt-1 max-w-md">
-                  Apenas o Administrador Master possui privilégios para cadastrar ou gerenciar outros usuários do sistema.
+                  Apenas o Administrador Master possui privilégios para editar dados de outros usuários.
                 </p>
               </div>
               <button
-                onClick={onClose}
+                onClick={() => setEditingUserId(null)}
                 className="mt-2 px-5 py-2 rounded-xl bg-slate-800 text-slate-200 hover:text-white font-bold text-xs"
               >
                 Voltar
               </button>
             </div>
           ) : (
-            /* MASTER USER DASHBOARD & MANAGEMENT OR DEDICATED EDIT FORM */
+            /* OPERATOR SWITCHER, MANAGEMENT & EDIT FORM */
             <>
               {/* Form error if any */}
               {formError && (
@@ -608,15 +607,17 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                             </div>
 
                             <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                type="button"
-                                onClick={() => startEditing(u)}
-                                title="Editar dados / Nome / Senha"
-                                className="px-2.5 py-1 rounded-lg text-xs font-bold text-amber-400 bg-slate-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/40 transition-colors flex items-center gap-1"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                                <span>Editar</span>
-                              </button>
+                              {(isMaster || u.id === activeUser.id) && (
+                                <button
+                                  type="button"
+                                  onClick={() => startEditing(u)}
+                                  title="Editar dados / Nome"
+                                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-amber-400 bg-slate-800 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/40 transition-colors flex items-center gap-1"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <span>Editar</span>
+                                </button>
+                              )}
 
                               {!isMasterAcc && onDeleteUserRequest && isMaster && (
                                 <button

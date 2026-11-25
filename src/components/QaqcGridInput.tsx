@@ -38,7 +38,11 @@ interface QaqcGridInputProps {
   currentArId?: string;
   resetKey?: string | number;
   codeErrorsById?: Record<string, string>;
+  codeErrorListById?: Record<string, string[]>;
+  codeWarningsById?: Record<string, string>;
   codeValidationMessages?: string[];
+  codeWarningMessages?: string[];
+  invalidCodeCount?: number;
   expectedLetterHint?: string;
 }
 
@@ -122,7 +126,11 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
   currentArId,
   resetKey,
   codeErrorsById,
+  codeErrorListById,
+  codeWarningsById,
   codeValidationMessages = [],
+  codeWarningMessages = [],
+  invalidCodeCount,
   expectedLetterHint,
 }) => {
   const samplePrefixPlaceholder =
@@ -366,7 +374,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
 
   const handleOreasPaste = (e: React.ClipboardEvent<HTMLInputElement>, startIndex: number, field: 'code' | 'lot') => {
     const text = e.clipboardData.getData('text');
-    if (!text || (!text.includes('\n') && !text.includes('\t'))) return;
+    if (!text || (!text.includes('\n') && !text.includes('\r') && !text.includes('\t'))) return;
 
     e.preventDefault();
     const lines = text
@@ -468,7 +476,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
 
   const handleBlkPaste = (e: React.ClipboardEvent<HTMLInputElement>, startIndex: number) => {
     const text = e.clipboardData.getData('text');
-    if (!text || (!text.includes('\n') && !text.includes('\t'))) return;
+    if (!text || (!text.includes('\n') && !text.includes('\r') && !text.includes('\t'))) return;
 
     e.preventDefault();
     const lines = text
@@ -558,7 +566,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
 
   const handleDupPaste = (e: React.ClipboardEvent<HTMLInputElement>, startIndex: number, field: 'code' | 'meter') => {
     const text = e.clipboardData.getData('text');
-    if (!text || (!text.includes('\n') && !text.includes('\t'))) return;
+    if (!text || (!text.includes('\n') && !text.includes('\r') && !text.includes('\t'))) return;
 
     e.preventDefault();
     const lines = text
@@ -721,6 +729,8 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
           const lotKey = row.lot.trim().toUpperCase();
           const isFilled = row.code.trim() !== '';
           const codeError = isFilled && codeErrorsById ? codeErrorsById[row.id] : undefined;
+          const codeErrorList = isFilled && codeErrorListById ? codeErrorListById[row.id] : undefined;
+          const codeWarning = !codeError && isFilled && codeWarningsById ? codeWarningsById[row.id] : undefined;
           const stockInfo = lotKey
             ? getAvailableStockForCode(row.lot.trim(), oreasStockEntries, ars, currentArId)
             : null;
@@ -730,106 +740,131 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
           return (
             <div
               key={row.id}
-              className={`flex items-center gap-2 px-3 py-2 transition-colors ${
+              className={`flex flex-col gap-1 px-3 py-2 transition-colors ${
                 codeError
                   ? 'bg-red-950/35 border-b border-red-900/50'
+                  : codeWarning
+                  ? 'bg-amber-950/20 border-b border-amber-900/30'
                   : isFilled
                   ? 'bg-purple-950/25 border-b border-purple-900/20'
                   : 'hover:bg-slate-800/40'
               }`}
             >
-              {/* Row Index */}
-              <div className="w-8 sm:w-9 text-center font-mono text-xs text-slate-400 font-bold shrink-0">
-                {idx + 1}
-              </div>
+              <div className="flex items-center gap-2">
+                {/* Row Index */}
+                <div className="w-8 sm:w-9 text-center font-mono text-xs text-slate-400 font-bold shrink-0">
+                  {idx + 1}
+                </div>
 
-              {/* Sample Code Input */}
-              <div className="flex-1 min-w-[130px]">
-                <input
-                  ref={(el) => {
-                    oreasCodeRefs.current[idx] = el;
-                  }}
-                  type="text"
-                  placeholder={`Ex: ${samplePrefixPlaceholder}09415`}
-                  value={row.code}
-                  onFocus={() => setLastFocusedOreasIndex(idx)}
-                  onChange={(e) => handleOreasChange(idx, 'code', e.target.value)}
-                  onBlur={(e) => {
-                    const trimmed = e.target.value.trim().toUpperCase();
-                    if (trimmed !== row.code) handleOreasChange(idx, 'code', trimmed);
-                  }}
-                  onKeyDown={(e) => handleOreasKeyDown(e, idx, 'code')}
-                  onPaste={(e) => handleOreasPaste(e, idx, 'code')}
-                  title={codeError || undefined}
-                  aria-invalid={Boolean(codeError)}
-                  className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
-                    codeError
-                      ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
-                      : isFilled
-                      ? 'border-purple-500/70 bg-purple-950/40 text-purple-100 focus:border-purple-400 focus:ring-1 focus:ring-purple-400/30'
-                      : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-purple-500'
-                  }`}
-                />
-              </div>
-
-              {/* Lot / Product Input with stock badge */}
-              <div className="flex-1 min-w-[150px] relative flex items-center">
-                <input
-                  ref={(el) => {
-                    oreasLotRefs.current[idx] = el;
-                  }}
-                  type="text"
-                  list="oreas-lots-list"
-                  placeholder="Ex: 250c"
-                  value={row.lot}
-                  onFocus={() => setLastFocusedOreasIndex(idx)}
-                  onChange={(e) => handleOreasChange(idx, 'lot', e.target.value)}
-                  onKeyDown={(e) => handleOreasKeyDown(e, idx, 'lot')}
-                  onPaste={(e) => handleOreasPaste(e, idx, 'lot')}
-                  className={`w-full px-3 py-2 ${
-                    lotKey && stockInfo ? 'pr-16' : 'pr-3'
-                  } rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
-                    isExceeded
-                      ? 'border-red-500 bg-red-950/40 text-red-200 focus:border-red-400 focus:ring-1 focus:ring-red-400/30'
-                      : row.lot.trim()
-                      ? 'border-purple-500/60 bg-purple-950/30 text-purple-200 focus:border-purple-400 focus:ring-1 focus:ring-purple-400/30'
-                      : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-purple-500'
-                  }`}
-                  title={stockInfo ? `Padrão: ${row.lot} | Saldo disponível: ${stockInfo.availableStock} un.` : 'Padrão ou lote OREAS'}
-                />
-                {lotKey && stockInfo && (
-                  <span
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono font-black px-2 py-0.5 rounded-md pointer-events-none shadow-xs z-10 select-none ${
-                      isExceeded
-                        ? 'bg-red-600 text-white animate-pulse'
-                        : stockInfo.availableStock <= 0
-                        ? 'bg-red-900/90 text-red-200 border border-red-700'
-                        : stockInfo.availableStock <= 5
-                        ? 'bg-amber-500 text-slate-950 font-black'
-                        : 'bg-emerald-600 text-white'
+                {/* Sample Code Input */}
+                <div className="flex-1 min-w-[130px]">
+                  <input
+                    ref={(el) => {
+                      oreasCodeRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    placeholder={`Ex: ${samplePrefixPlaceholder}09415`}
+                    value={row.code}
+                    onFocus={() => setLastFocusedOreasIndex(idx)}
+                    onChange={(e) => handleOreasChange(idx, 'code', e.target.value)}
+                    onBlur={(e) => {
+                      const trimmed = e.target.value.trim().toUpperCase();
+                      if (trimmed !== row.code) handleOreasChange(idx, 'code', trimmed);
+                    }}
+                    onKeyDown={(e) => handleOreasKeyDown(e, idx, 'code')}
+                    onPaste={(e) => handleOreasPaste(e, idx, 'code')}
+                    title={codeError || codeWarning || undefined}
+                    aria-invalid={Boolean(codeError)}
+                    className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
+                      codeError
+                        ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
+                        : codeWarning
+                        ? 'border-amber-500/60 bg-amber-950/30 text-amber-100 focus:border-amber-400'
+                        : isFilled
+                        ? 'border-purple-500/70 bg-purple-950/40 text-purple-100 focus:border-purple-400 focus:ring-1 focus:ring-purple-400/30'
+                        : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-purple-500'
                     }`}
-                    title={`Saldo em estoque: ${stockInfo.availableStock} un.`}
-                  >
-                    {stockInfo.availableStock}un
-                  </span>
-                )}
+                  />
+                </div>
+
+                {/* Lot / Product Input with stock badge */}
+                <div className="flex-1 min-w-[150px] relative flex items-center">
+                  <input
+                    ref={(el) => {
+                      oreasLotRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    list="oreas-lots-list"
+                    placeholder="Ex: 250c"
+                    value={row.lot}
+                    onFocus={() => setLastFocusedOreasIndex(idx)}
+                    onChange={(e) => handleOreasChange(idx, 'lot', e.target.value)}
+                    onKeyDown={(e) => handleOreasKeyDown(e, idx, 'lot')}
+                    onPaste={(e) => handleOreasPaste(e, idx, 'lot')}
+                    className={`w-full px-3 py-2 ${
+                      lotKey && stockInfo ? 'pr-16' : 'pr-3'
+                    } rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
+                      isExceeded
+                        ? 'border-red-500 bg-red-950/40 text-red-200 focus:border-red-400 focus:ring-1 focus:ring-red-400/30'
+                        : row.lot.trim()
+                        ? 'border-purple-500/60 bg-purple-950/30 text-purple-200 focus:border-purple-400 focus:ring-1 focus:ring-purple-400/30'
+                        : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-purple-500'
+                    }`}
+                    title={stockInfo ? `Padrão: ${row.lot} | Saldo disponível: ${stockInfo.availableStock} un.` : 'Padrão ou lote OREAS'}
+                  />
+                  {lotKey && stockInfo && (
+                    <span
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono font-black px-2 py-0.5 rounded-md pointer-events-none shadow-xs z-10 select-none ${
+                        isExceeded
+                          ? 'bg-red-600 text-white animate-pulse'
+                          : stockInfo.availableStock <= 0
+                          ? 'bg-red-900/90 text-red-200 border border-red-700'
+                          : stockInfo.availableStock <= 5
+                          ? 'bg-amber-500 text-slate-950 font-black'
+                          : 'bg-emerald-600 text-white'
+                      }`}
+                      title={`Saldo em estoque: ${stockInfo.availableStock} un.`}
+                    >
+                      {stockInfo.availableStock}un
+                    </span>
+                  )}
+                </div>
+
+                {/* Delete / Clear button */}
+                <div className="w-8 shrink-0 flex justify-center">
+                  {row.code || row.lot ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteOreasRow(idx)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Limpar / remover esta linha"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <span className="w-4 h-4 text-slate-600 text-center text-xs leading-4">•</span>
+                  )}
+                </div>
               </div>
 
-              {/* Delete / Clear button */}
-              <div className="w-8 shrink-0 flex justify-center">
-                {row.code || row.lot ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteOreasRow(idx)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                    title="Limpar / remover esta linha"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <span className="w-4 h-4 text-slate-600 text-center text-xs leading-4">•</span>
-                )}
-              </div>
+              {codeError && (
+                <div className="pl-10 pr-2 flex flex-col gap-0.5">
+                  {(codeErrorList && codeErrorList.length > 0 ? codeErrorList : [codeError]).map((errText, errIdx) => (
+                    <span key={errIdx} className="text-[11px] text-red-300 font-semibold leading-snug">
+                      • {errText}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {codeWarning && (
+                <div className="pl-10 pr-2">
+                  <span className="text-[10px] text-amber-300/85 font-medium flex items-center gap-1">
+                    <Info className="w-3 h-3 shrink-0 text-amber-400" />
+                    <span>{codeWarning}</span>
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}
@@ -922,66 +957,93 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
         {blkRows.map((row, idx) => {
           const isFilled = row.code.trim() !== '';
           const codeError = isFilled && codeErrorsById ? codeErrorsById[row.id] : undefined;
+          const codeErrorList = isFilled && codeErrorListById ? codeErrorListById[row.id] : undefined;
+          const codeWarning = !codeError && isFilled && codeWarningsById ? codeWarningsById[row.id] : undefined;
 
           return (
             <div
               key={row.id}
-              className={`flex items-center gap-2 px-3 py-2 transition-colors ${
+              className={`flex flex-col gap-1 px-3 py-2 transition-colors ${
                 codeError
                   ? 'bg-red-950/35 border-b border-red-900/50'
+                  : codeWarning
+                  ? 'bg-amber-950/20 border-b border-amber-900/30'
                   : isFilled
                   ? 'bg-amber-950/25 border-b border-amber-900/20'
                   : 'hover:bg-slate-800/40'
               }`}
             >
-              {/* Row Index */}
-              <div className="w-8 sm:w-9 text-center font-mono text-xs text-slate-400 font-bold shrink-0">
-                {idx + 1}
+              <div className="flex items-center gap-2">
+                {/* Row Index */}
+                <div className="w-8 sm:w-9 text-center font-mono text-xs text-slate-400 font-bold shrink-0">
+                  {idx + 1}
+                </div>
+
+                {/* Sample Code Input */}
+                <div className="flex-1 min-w-[180px]">
+                  <input
+                    ref={(el) => {
+                      blkCodeRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    placeholder={`Ex: ${samplePrefixPlaceholder}09400`}
+                    value={row.code}
+                    onChange={(e) => handleBlkChange(idx, e.target.value)}
+                    onBlur={(e) => {
+                      const trimmed = e.target.value.trim().toUpperCase();
+                      if (trimmed !== row.code) handleBlkChange(idx, trimmed);
+                    }}
+                    onKeyDown={(e) => handleBlkKeyDown(e, idx)}
+                    onPaste={(e) => handleBlkPaste(e, idx)}
+                    title={codeError || codeWarning || undefined}
+                    aria-invalid={Boolean(codeError)}
+                    className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
+                      codeError
+                        ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
+                        : codeWarning
+                        ? 'border-amber-500/60 bg-amber-950/30 text-amber-100 focus:border-amber-400'
+                        : isFilled
+                        ? 'border-amber-500/70 bg-amber-950/40 text-amber-100 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30'
+                        : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-amber-500'
+                    }`}
+                  />
+                </div>
+
+                {/* Delete / Clear button */}
+                <div className="w-8 shrink-0 flex justify-center">
+                  {row.code ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBlkRow(idx)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Limpar / remover esta linha"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <span className="w-4 h-4 text-slate-600 text-center text-xs leading-4">•</span>
+                  )}
+                </div>
               </div>
 
-              {/* Sample Code Input */}
-              <div className="flex-1 min-w-[180px]">
-                <input
-                  ref={(el) => {
-                    blkCodeRefs.current[idx] = el;
-                  }}
-                  type="text"
-                  placeholder={`Ex: ${samplePrefixPlaceholder}09400`}
-                  value={row.code}
-                  onChange={(e) => handleBlkChange(idx, e.target.value)}
-                  onBlur={(e) => {
-                    const trimmed = e.target.value.trim().toUpperCase();
-                    if (trimmed !== row.code) handleBlkChange(idx, trimmed);
-                  }}
-                  onKeyDown={(e) => handleBlkKeyDown(e, idx)}
-                  onPaste={(e) => handleBlkPaste(e, idx)}
-                  title={codeError || undefined}
-                  aria-invalid={Boolean(codeError)}
-                  className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
-                    codeError
-                      ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
-                      : isFilled
-                      ? 'border-amber-500/70 bg-amber-950/40 text-amber-100 focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30'
-                      : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-amber-500'
-                  }`}
-                />
-              </div>
+              {codeError && (
+                <div className="pl-10 pr-2 flex flex-col gap-0.5">
+                  {(codeErrorList && codeErrorList.length > 0 ? codeErrorList : [codeError]).map((errText, errIdx) => (
+                    <span key={errIdx} className="text-[11px] text-red-300 font-semibold leading-snug">
+                      • {errText}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-              {/* Delete / Clear button */}
-              <div className="w-8 shrink-0 flex justify-center">
-                {row.code ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteBlkRow(idx)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                    title="Limpar / remover esta linha"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <span className="w-4 h-4 text-slate-600 text-center text-xs leading-4">•</span>
-                )}
-              </div>
+              {codeWarning && (
+                <div className="pl-10 pr-2">
+                  <span className="text-[10px] text-amber-300/85 font-medium flex items-center gap-1">
+                    <Info className="w-3 h-3 shrink-0 text-amber-400" />
+                    <span>{codeWarning}</span>
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1066,87 +1128,114 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
         {dupRows.map((row, idx) => {
           const isFilled = row.code.trim() !== '';
           const codeError = isFilled && codeErrorsById ? codeErrorsById[row.id] : undefined;
+          const codeErrorList = isFilled && codeErrorListById ? codeErrorListById[row.id] : undefined;
+          const codeWarning = !codeError && isFilled && codeWarningsById ? codeWarningsById[row.id] : undefined;
 
           return (
             <div
               key={row.id}
-              className={`flex items-center gap-2 px-3 py-2 transition-colors ${
+              className={`flex flex-col gap-1 px-3 py-2 transition-colors ${
                 codeError
                   ? 'bg-red-950/35 border-b border-red-900/50'
+                  : codeWarning
+                  ? 'bg-amber-950/20 border-b border-amber-900/30'
                   : isFilled
                   ? 'bg-cyan-950/25 border-b border-cyan-900/20'
                   : 'hover:bg-slate-800/40'
               }`}
             >
-              {/* Row Index */}
-              <div className="w-8 sm:w-9 text-center font-mono text-xs text-slate-400 font-bold shrink-0">
-                {idx + 1}
+              <div className="flex items-center gap-2">
+                {/* Row Index */}
+                <div className="w-8 sm:w-9 text-center font-mono text-xs text-slate-400 font-bold shrink-0">
+                  {idx + 1}
+                </div>
+
+                {/* Sample Code Input */}
+                <div className="flex-1 min-w-[120px]">
+                  <input
+                    ref={(el) => {
+                      dupCodeRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    placeholder={`Ex: ${samplePrefixPlaceholder}09420`}
+                    value={row.code}
+                    onChange={(e) => handleDupChange(idx, 'code', e.target.value)}
+                    onBlur={(e) => {
+                      const trimmed = e.target.value.trim().toUpperCase();
+                      if (trimmed !== row.code) handleDupChange(idx, 'code', trimmed);
+                    }}
+                    onKeyDown={(e) => handleDupKeyDown(e, idx, 'code')}
+                    onPaste={(e) => handleDupPaste(e, idx, 'code')}
+                    title={codeError || codeWarning || undefined}
+                    aria-invalid={Boolean(codeError)}
+                    className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
+                      codeError
+                        ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
+                        : codeWarning
+                        ? 'border-amber-500/60 bg-amber-950/30 text-amber-100 focus:border-amber-400'
+                        : isFilled
+                        ? 'border-cyan-500/70 bg-cyan-950/40 text-cyan-100 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30'
+                        : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500'
+                    }`}
+                  />
+                </div>
+
+                {/* Duplicate Meter Input */}
+                <div className="flex-1 min-w-[120px]">
+                  <input
+                    ref={(el) => {
+                      dupMeterRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    placeholder="Ex: 45.0m"
+                    value={row.meter}
+                    onChange={(e) => handleDupChange(idx, 'meter', e.target.value)}
+                    onKeyDown={(e) => handleDupKeyDown(e, idx, 'meter')}
+                    onPaste={(e) => handleDupPaste(e, idx, 'meter')}
+                    className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
+                      row.meter.trim()
+                        ? 'border-cyan-500/60 bg-cyan-950/30 text-cyan-200 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30'
+                        : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500'
+                    }`}
+                    title="Metro de onde a duplicata foi coletada (ex: 45m, 12.5m)"
+                  />
+                </div>
+
+                {/* Delete / Clear button */}
+                <div className="w-8 shrink-0 flex justify-center">
+                  {row.code || row.meter ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDupRow(idx)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Limpar / remover esta linha"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <span className="w-4 h-4 text-slate-600 text-center text-xs leading-4">•</span>
+                  )}
+                </div>
               </div>
 
-              {/* Sample Code Input */}
-              <div className="flex-1 min-w-[120px]">
-                <input
-                  ref={(el) => {
-                    dupCodeRefs.current[idx] = el;
-                  }}
-                  type="text"
-                  placeholder={`Ex: ${samplePrefixPlaceholder}09420`}
-                  value={row.code}
-                  onChange={(e) => handleDupChange(idx, 'code', e.target.value)}
-                  onBlur={(e) => {
-                    const trimmed = e.target.value.trim().toUpperCase();
-                    if (trimmed !== row.code) handleDupChange(idx, 'code', trimmed);
-                  }}
-                  onKeyDown={(e) => handleDupKeyDown(e, idx, 'code')}
-                  onPaste={(e) => handleDupPaste(e, idx, 'code')}
-                  title={codeError || undefined}
-                  aria-invalid={Boolean(codeError)}
-                  className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
-                    codeError
-                      ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
-                      : isFilled
-                      ? 'border-cyan-500/70 bg-cyan-950/40 text-cyan-100 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30'
-                      : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500'
-                  }`}
-                />
-              </div>
+              {codeError && (
+                <div className="pl-10 pr-2 flex flex-col gap-0.5">
+                  {(codeErrorList && codeErrorList.length > 0 ? codeErrorList : [codeError]).map((errText, errIdx) => (
+                    <span key={errIdx} className="text-[11px] text-red-300 font-semibold leading-snug">
+                      • {errText}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-              {/* Duplicate Meter Input */}
-              <div className="flex-1 min-w-[120px]">
-                <input
-                  ref={(el) => {
-                    dupMeterRefs.current[idx] = el;
-                  }}
-                  type="text"
-                  placeholder="Ex: 45.0m"
-                  value={row.meter}
-                  onChange={(e) => handleDupChange(idx, 'meter', e.target.value)}
-                  onKeyDown={(e) => handleDupKeyDown(e, idx, 'meter')}
-                  onPaste={(e) => handleDupPaste(e, idx, 'meter')}
-                  className={`w-full px-3 py-2 rounded-xl border text-sm font-mono font-bold outline-none transition-all h-11 sm:h-10 ${
-                    row.meter.trim()
-                      ? 'border-cyan-500/60 bg-cyan-950/30 text-cyan-200 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30'
-                      : 'border-slate-700 bg-slate-950/80 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500'
-                  }`}
-                  title="Metro de onde a duplicata foi coletada (ex: 45m, 12.5m)"
-                />
-              </div>
-
-              {/* Delete / Clear button */}
-              <div className="w-8 shrink-0 flex justify-center">
-                {row.code || row.meter ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteDupRow(idx)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                    title="Limpar / remover esta linha"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <span className="w-4 h-4 text-slate-600 text-center text-xs leading-4">•</span>
-                )}
-              </div>
+              {codeWarning && (
+                <div className="pl-10 pr-2">
+                  <span className="text-[10px] text-amber-300/85 font-medium flex items-center gap-1">
+                    <Info className="w-3 h-3 shrink-0 text-amber-400" />
+                    <span>{codeWarning}</span>
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1326,18 +1415,37 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
         renderDupColumn(true)
       )}
 
-      {/* Validation error banner for invalid QA/QC starting letters */}
-      {codeValidationMessages.length > 0 && (
-        <div className="p-3 rounded-xl bg-red-950/80 border border-red-700/80 text-red-200 text-xs flex flex-col gap-1">
-          <div className="font-bold flex items-center gap-2 text-red-300">
-            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-            <span>Erro nos códigos QA/QC (letra incompatível):</span>
+      {/* Validation error banner for invalid QA/QC codes */}
+      {codeValidationMessages.length > 0 && (() => {
+        const count = invalidCodeCount ?? Object.keys(codeErrorsById || {}).length;
+        return (
+          <div className="p-3 rounded-xl bg-red-950/80 border border-red-700/80 text-red-200 text-xs flex flex-col gap-1">
+            <div className="font-bold flex items-center gap-2 text-red-300">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>
+                {count > 0
+                  ? `${count} ${count === 1 ? 'código de padrão QA/QC inválido' : 'códigos de padrão QA/QC inválidos'}:`
+                  : 'Erro nos códigos QA/QC:'}
+              </span>
+            </div>
+            <ul className="list-disc list-inside space-y-0.5 pl-1 text-[11px] text-red-200">
+              {codeValidationMessages.map((msg, i) => (
+                <li key={i}>{msg}</li>
+              ))}
+            </ul>
           </div>
-          <ul className="list-disc list-inside space-y-0.5 pl-1 text-[11px] text-red-200">
-            {codeValidationMessages.map((msg, i) => (
-              <li key={i}>{msg}</li>
-            ))}
-          </ul>
+        );
+      })()}
+
+      {/* Discrete non-blocking warning banner for legacy saved QA/QC standards */}
+      {codeWarningMessages.length > 0 && (
+        <div className="p-2.5 rounded-xl bg-amber-950/35 border border-amber-700/40 text-amber-200/90 text-[11px] flex flex-col gap-1">
+          <div className="font-semibold flex items-center gap-1.5 text-amber-300">
+            <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>
+              Aviso: {codeWarningMessages.length} {codeWarningMessages.length === 1 ? 'padrão salvo anteriormente está' : 'padrões salvos anteriormente estão'} fora da regra atual (mantido(s) sem impedir o salvamento).
+            </span>
+          </div>
         </div>
       )}
 

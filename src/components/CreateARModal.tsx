@@ -191,8 +191,31 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [modalKey, setModalKey] = useState<number>(() => Date.now());
 
+  const initialSnapshot = useMemo(() => {
+    if (!arToEdit) {
+      return { samples: [] as QaQcSample[], legacyCodeById: {} as Record<string, string> };
+    }
+    const samplesWithIds = initialResolvedQaqc.effectiveSamples.map((s, idx) => ({
+      ...s,
+      id: s.id || `legacy_${arToEdit.id}_${idx}`,
+    }));
+    const legacyMap: Record<string, string> = {};
+    samplesWithIds.forEach((s) => {
+      const normalized = normalizeSampleCode(s.code);
+      if (s.id && normalized) {
+        legacyMap[s.id] = normalized;
+      }
+    });
+    return { samples: samplesWithIds, legacyCodeById: legacyMap };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arToEdit?.id]);
+
   // QA/QC control samples list (initialized synchronously on first render!)
-  const [qaqcSamples, setQaqcSamples] = useState<QaQcSample[]>(() => initialResolvedQaqc.effectiveSamples);
+  const [initialQaqcSamples, setInitialQaqcSamples] = useState<QaQcSample[]>(() => initialSnapshot.samples);
+  const [qaqcSamples, setQaqcSamples] = useState<QaQcSample[]>(() => initialSnapshot.samples);
+  const [legacySavedCodeById, setLegacySavedCodeById] = useState<Record<string, string>>(
+    () => initialSnapshot.legacyCodeById
+  );
 
   const currentHole = holes.find((h) => h.id === holeId) || selectedHoleObj;
   const effectiveHoleType =
@@ -210,8 +233,11 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
   );
 
   const qaqcLetterValidation = useMemo(
-    () => validateQaqcSamplesForHoleType(qaqcSamples, arSampleRangeList, effectiveHoleType),
-    [qaqcSamples, arSampleRangeList, effectiveHoleType]
+    () =>
+      validateQaqcSamplesForHoleType(qaqcSamples, arSampleRangeList, effectiveHoleType, {
+        legacySavedCodeById,
+      }),
+    [qaqcSamples, arSampleRangeList, effectiveHoleType, legacySavedCodeById]
   );
 
   const hasRealTimeLetterErrors = !rangeLetterValidation.isValid || !qaqcLetterValidation.isValid;
@@ -239,6 +265,18 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
           padroes: resolution.effectiveSamples,
         });
 
+        const samplesWithIds = resolution.effectiveSamples.map((s, idx) => ({
+          ...s,
+          id: s.id || `legacy_${arToEdit.id}_${idx}`,
+        }));
+        const legacyMap: Record<string, string> = {};
+        samplesWithIds.forEach((s) => {
+          const normalized = normalizeSampleCode(s.code);
+          if (s.id && normalized) {
+            legacyMap[s.id] = normalized;
+          }
+        });
+
         setHoleId(arToEdit.drillHoleId);
         setArCode(arToEdit.arCode);
         setStartSampleCode(arToEdit.startSampleCode);
@@ -249,7 +287,9 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
         setWeightKg(arToEdit.weightKg);
         setShipmentDate(arToEdit.shipmentDate);
         setNotes(arToEdit.notes || '');
-        setQaqcSamples(resolution.effectiveSamples);
+        setInitialQaqcSamples(samplesWithIds);
+        setQaqcSamples(samplesWithIds);
+        setLegacySavedCodeById(legacyMap);
         setErrorMsg('');
       } else {
         // New Mode
@@ -282,7 +322,9 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
         setWeightKg(0);
         setShipmentDate(new Date().toISOString().split('T')[0]);
         setNotes('');
+        setInitialQaqcSamples([]);
         setQaqcSamples([]);
+        setLegacySavedCodeById({});
         setErrorMsg('');
       }
     }
@@ -307,7 +349,9 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
         setSampleCount(0);
       }
       // Reset QA/QC when switching hole for new AR
+      setInitialQaqcSamples([]);
       setQaqcSamples([]);
+      setLegacySavedCodeById({});
       setModalKey((prev) => prev + 1);
     }
   };
@@ -393,7 +437,8 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
     const submitQaqcValidation = validateQaqcSamplesForHoleType(
       cleanedQaqc,
       normalizedRanges,
-      effectiveHoleType
+      effectiveHoleType,
+      { legacySavedCodeById }
     );
     if (!submitQaqcValidation.isValid) {
       setErrorMsg(submitQaqcValidation.messages[0]);
@@ -641,13 +686,17 @@ export const CreateARModal: React.FC<CreateARModalProps> = ({
             <QaqcGridInput
               key={`edit-ar-${arToEdit ? arToEdit.id : 'new-ar'}-${modalKey}`}
               resetKey={modalKey}
-              initialSamples={qaqcSamples}
+              initialSamples={initialQaqcSamples}
               onChange={setQaqcSamples}
               oreasStockEntries={oreasStockEntries}
               ars={ars}
               currentArId={arToEdit?.id}
               codeErrorsById={qaqcLetterValidation.errorsById}
+              codeErrorListById={qaqcLetterValidation.errorListById}
+              codeWarningsById={qaqcLetterValidation.warningsById}
               codeValidationMessages={qaqcLetterValidation.messages}
+              codeWarningMessages={qaqcLetterValidation.warningMessages}
+              invalidCodeCount={qaqcLetterValidation.invalidCount}
               expectedLetterHint={
                 qaqcLetterValidation.expectedLetters.length === 1
                   ? qaqcLetterValidation.expectedLetters[0]

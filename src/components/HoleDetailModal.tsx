@@ -9,6 +9,7 @@ import {
   getHoleTypeLabel,
   isValidHoleType,
   normalizeSampleCode,
+  validateHoleNameForType,
   validateSampleRangesForHoleType,
 } from '../constants/holeTypes';
 import { saveARToDb } from '../services/firebase';
@@ -97,6 +98,57 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
   const effectiveHoleType: HoleType | undefined = editingHoleInfo
     ? (isValidHoleType(holeTypeInput) ? holeTypeInput : undefined)
     : (isValidHoleType(hole?.holeType) ? hole?.holeType : undefined);
+
+  const infoNameOrTypeChanged = Boolean(
+    hole &&
+      editingHoleInfo &&
+      (normalizeSampleCode(codeInput) !== normalizeSampleCode(hole.code) ||
+        (isValidHoleType(holeTypeInput) ? holeTypeInput : '') !==
+          (isValidHoleType(hole.holeType) ? hole.holeType : ''))
+  );
+
+  const holeInfoNameValidation = useMemo(() => {
+    if (!hole || !editingHoleInfo || !infoNameOrTypeChanged) {
+      return { isValid: true, normalizedName: normalizeSampleCode(codeInput), extractedPrefix: '' };
+    }
+    return validateHoleNameForType(
+      codeInput,
+      isValidHoleType(holeTypeInput) ? holeTypeInput : undefined
+    );
+  }, [hole, editingHoleInfo, infoNameOrTypeChanged, codeInput, holeTypeInput]);
+
+  const originalHoleRanges = useMemo(() => {
+    if (!hole) return [];
+    const base =
+      hole.sampleRanges && hole.sampleRanges.length > 0
+        ? hole.sampleRanges
+        : hole.firstSampleCode || hole.lastSampleCode
+        ? [{ firstSampleCode: hole.firstSampleCode || '', lastSampleCode: hole.lastSampleCode || '' }]
+        : [];
+    return base
+      .map((r) => ({
+        firstSampleCode: normalizeSampleCode(r.firstSampleCode),
+        lastSampleCode: normalizeSampleCode(r.lastSampleCode),
+      }))
+      .filter((r) => r.firstSampleCode !== '' || r.lastSampleCode !== '');
+  }, [hole?.id, hole?.firstSampleCode, hole?.lastSampleCode, JSON.stringify(hole?.sampleRanges)]);
+
+  const rangesChanged = useMemo(() => {
+    const currentCleaned = sampleRanges
+      .map((r) => ({
+        firstSampleCode: normalizeSampleCode(r.firstSampleCode),
+        lastSampleCode: normalizeSampleCode(r.lastSampleCode),
+      }))
+      .filter((r) => r.firstSampleCode !== '' || r.lastSampleCode !== '');
+    return JSON.stringify(currentCleaned) !== JSON.stringify(originalHoleRanges);
+  }, [sampleRanges, originalHoleRanges]);
+
+  const planHoleNameValidation = useMemo(() => {
+    if (!hole || !rangesChanged) {
+      return { isValid: true, normalizedName: normalizeSampleCode(hole?.code || ''), extractedPrefix: '' };
+    }
+    return validateHoleNameForType(hole.code, effectiveHoleType);
+  }, [hole, rangesChanged, effectiveHoleType]);
 
   const rangeLetterValidation = useMemo(
     () => validateSampleRangesForHoleType(sampleRanges, effectiveHoleType),
@@ -190,6 +242,14 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
       return;
     }
 
+    if (JSON.stringify(cleanedRanges) !== JSON.stringify(originalHoleRanges)) {
+      const nameCheck = validateHoleNameForType(hole.code, effectiveHoleType);
+      if (!nameCheck.isValid) {
+        setPlanErrorMsg(nameCheck.errorMessage || 'Prefixo do nome do furo inválido para o tipo selecionado.');
+        return;
+      }
+    }
+
     const check = parseSampleRanges(cleanedRanges);
     if (!check.isValid) {
       setPlanErrorMsg(check.error || 'Formato de faixa inválido. Use letras seguidas de números (ex: D00200 até D00401).');
@@ -267,68 +327,99 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col sm:flex-row items-start sm:items-end gap-2 mt-2 bg-slate-900 p-3 rounded-xl border border-amber-500/40 flex-wrap">
-                <div className="flex-1 min-w-[160px] w-full sm:w-auto">
-                  <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Nome / Código do Furo:</label>
-                  <input
-                    type="text"
-                    value={codeInput}
-                    onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-950 font-mono text-white text-sm font-bold outline-none focus:border-amber-500"
-                    placeholder="Ex: GUD-26-051"
-                  />
+              <div className="flex flex-col gap-2 mt-2 bg-slate-900 p-3 rounded-xl border border-amber-500/40">
+                <div className="flex flex-col sm:flex-row items-start sm:items-end gap-2 flex-wrap">
+                  <div className="flex-1 min-w-[160px] w-full sm:w-auto">
+                    <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Nome / Código do Furo:</label>
+                    <input
+                      type="text"
+                      value={codeInput}
+                      onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+                      onBlur={(e) => setCodeInput(normalizeSampleCode(e.target.value))}
+                      aria-invalid={!holeInfoNameValidation.isValid}
+                      className={`w-full px-3 py-1.5 rounded-lg border font-mono text-sm font-bold outline-none ${
+                        !holeInfoNameValidation.isValid
+                          ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400'
+                          : 'border-slate-700 bg-slate-950 text-white focus:border-amber-500'
+                      }`}
+                      placeholder={`Ex: ${
+                        isValidHoleType(holeTypeInput)
+                          ? HOLE_TYPE_CONFIG[holeTypeInput].exampleHoleName
+                          : 'GUD-26-082'
+                      }`}
+                    />
+                  </div>
+                  <div className="w-full sm:w-36">
+                    <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Alvo:</label>
+                    <input
+                      type="text"
+                      value={targetInput}
+                      onChange={(e) => setTargetInput(e.target.value.toUpperCase())}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-sm font-bold outline-none focus:border-amber-500"
+                      placeholder="Ex: GERAL"
+                    />
+                  </div>
+                  <div className="w-full sm:w-44">
+                    <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Tipo de Furo:</label>
+                    <select
+                      value={holeTypeInput}
+                      onChange={(e) => setHoleTypeInput((e.target.value as HoleType) || '')}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs font-bold outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      <option value="">Sem tipo</option>
+                      {HOLE_TYPE_ORDER.map((typeKey) => (
+                        <option key={typeKey} value={typeKey}>
+                          {HOLE_TYPE_CONFIG[typeKey].label} ({HOLE_TYPE_CONFIG[typeKey].letterHint})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-1.5 self-end">
+                    <button
+                      type="button"
+                      disabled={!holeInfoNameValidation.isValid || !codeInput.trim()}
+                      onClick={() => {
+                        const normalized = normalizeSampleCode(codeInput);
+                        if (!normalized) return;
+                        if (infoNameOrTypeChanged) {
+                          const check = validateHoleNameForType(
+                            normalized,
+                            isValidHoleType(holeTypeInput) ? holeTypeInput : undefined
+                          );
+                          if (!check.isValid) return;
+                        }
+                        onUpdateHoleInfo?.(
+                          hole.id,
+                          normalized,
+                          targetInput,
+                          isValidHoleType(holeTypeInput) ? holeTypeInput : ''
+                        );
+                        setEditingHoleInfo(false);
+                      }}
+                      className={`px-3 py-1.5 font-bold text-xs rounded-lg transition-all flex items-center gap-1 shadow-sm ${
+                        !holeInfoNameValidation.isValid || !codeInput.trim()
+                          ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                          : 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer'
+                      }`}
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Salvar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingHoleInfo(false)}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
                 </div>
-                <div className="w-full sm:w-36">
-                  <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Alvo:</label>
-                  <input
-                    type="text"
-                    value={targetInput}
-                    onChange={(e) => setTargetInput(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-sm font-bold outline-none focus:border-amber-500"
-                    placeholder="Ex: GERAL"
-                  />
-                </div>
-                <div className="w-full sm:w-44">
-                  <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Tipo de Furo:</label>
-                  <select
-                    value={holeTypeInput}
-                    onChange={(e) => setHoleTypeInput((e.target.value as HoleType) || '')}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white text-xs font-bold outline-none focus:border-amber-500 cursor-pointer"
-                  >
-                    <option value="">Sem tipo</option>
-                    {HOLE_TYPE_ORDER.map((typeKey) => (
-                      <option key={typeKey} value={typeKey}>
-                        {HOLE_TYPE_CONFIG[typeKey].label} ({HOLE_TYPE_CONFIG[typeKey].letterHint})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-1.5 self-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!codeInput.trim()) return;
-                      onUpdateHoleInfo?.(
-                        hole.id,
-                        codeInput,
-                        targetInput,
-                        isValidHoleType(holeTypeInput) ? holeTypeInput : ''
-                      );
-                      setEditingHoleInfo(false);
-                    }}
-                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition-all flex items-center gap-1 shadow-sm"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>Salvar</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingHoleInfo(false)}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-all"
-                  >
-                    Cancelar
-                  </button>
-                </div>
+                {!holeInfoNameValidation.isValid && holeInfoNameValidation.errorMessage && (
+                  <p className="text-[11px] text-red-300 font-medium flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                    <span>{holeInfoNameValidation.errorMessage}</span>
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -499,11 +590,16 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
                 })}
               </div>
 
-              {(planErrorMsg || !rangeLetterValidation.isValid) && (
+              {(planErrorMsg || !rangeLetterValidation.isValid || !planHoleNameValidation.isValid) && (
                 <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-800 text-[11px] text-red-200 flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                   <div className="flex flex-col gap-0.5">
                     {planErrorMsg && <span>{planErrorMsg}</span>}
+                    {!planHoleNameValidation.isValid &&
+                      planHoleNameValidation.errorMessage &&
+                      planHoleNameValidation.errorMessage !== planErrorMsg && (
+                        <span>{planHoleNameValidation.errorMessage}</span>
+                      )}
                     {rangeLetterValidation.messages
                       .filter((m) => m !== planErrorMsg)
                       .map((m, i) => (
@@ -524,9 +620,9 @@ export const HoleDetailModal: React.FC<HoleDetailModalProps> = ({
 
                 <button
                   type="submit"
-                  disabled={!rangeLetterValidation.isValid}
+                  disabled={!rangeLetterValidation.isValid || !planHoleNameValidation.isValid}
                   className={`px-4 py-2 font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-sm ${
-                    !rangeLetterValidation.isValid
+                    !rangeLetterValidation.isValid || !planHoleNameValidation.isValid
                       ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
                       : 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer'
                   }`}

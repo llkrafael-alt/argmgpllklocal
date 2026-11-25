@@ -5,6 +5,7 @@ import {
   HOLE_TYPE_CONFIG,
   HOLE_TYPE_ORDER,
   normalizeSampleCode,
+  validateHoleNameForType,
   validateSampleRangesForHoleType,
   validateQaqcSamplesForHoleType,
 } from '../constants/holeTypes';
@@ -98,7 +99,12 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
     onClose();
   };
 
-  // Real-time sample & QA/QC letter validation (derived cleanly, zero loops)
+  // Real-time hole name, sample range & QA/QC validation (derived cleanly, zero loops)
+  const holeNameValidation = useMemo(
+    () => validateHoleNameForType(code, selectedHoleType),
+    [code, selectedHoleType]
+  );
+
   const rangeLetterValidation = useMemo(
     () => validateSampleRangesForHoleType(sampleRanges, selectedHoleType),
     [sampleRanges, selectedHoleType]
@@ -112,7 +118,8 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
   if (!isOpen) return null;
 
   const activeTypeConfig = selectedHoleType ? HOLE_TYPE_CONFIG[selectedHoleType] : null;
-  const hasRealTimeLetterErrors = !rangeLetterValidation.isValid || !qaqcLetterValidation.isValid;
+  const hasRealTimeErrors =
+    !holeNameValidation.isValid || !rangeLetterValidation.isValid || !qaqcLetterValidation.isValid;
 
   // Real-time multi-range sample calculation
   const multiCheck = parseSampleRanges(sampleRanges);
@@ -164,7 +171,13 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
     const trimmedTarget = normalizeSampleCode(target) || 'GERAL';
 
     if (!trimmedCode) {
-      setErrorMsg('Informe o nome ou código do furo/amostra (ex: GUD-26-051).');
+      setErrorMsg('Informe o nome ou código do furo/amostra (ex: GUD-26-082).');
+      return;
+    }
+
+    const submitNameValidation = validateHoleNameForType(trimmedCode, selectedHoleType);
+    if (!submitNameValidation.isValid) {
+      setErrorMsg(submitNameValidation.errorMessage || 'Prefixo do nome do furo inválido.');
       return;
     }
 
@@ -397,6 +410,12 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
                   </span>
                   <span className="text-xs text-slate-300 font-mono">
                     Letra permitida: <strong className="text-white">{activeTypeConfig.letterHint}</strong>
+                    {activeTypeConfig.requiredNamePrefix && (
+                      <>
+                        {' '}• Prefixo do furo:{' '}
+                        <strong className="text-white">{activeTypeConfig.requiredNamePrefix}</strong>
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -412,15 +431,19 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
             )}
 
             {/* Submit or real-time validation error summary */}
-            {(errorMsg || hasRealTimeLetterErrors) && (
+            {(errorMsg || hasRealTimeErrors) && (
               <div className="p-3.5 rounded-xl bg-red-950/80 border border-red-700 text-red-200 text-xs font-semibold flex flex-col gap-1.5">
                 <div className="flex items-center gap-2 text-red-300 font-bold">
                   <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-                  <span>{errorMsg || 'Corrija os códigos destacados antes de salvar:'}</span>
+                  <span>{errorMsg || 'Corrija os campos destacados antes de salvar:'}</span>
                 </div>
-                {hasRealTimeLetterErrors && (
+                {hasRealTimeErrors && (
                   <ul className="list-disc list-inside space-y-0.5 pl-1 text-[11px] text-red-200 font-medium">
-                    {[...rangeLetterValidation.messages, ...qaqcLetterValidation.messages]
+                    {[
+                      ...(holeNameValidation.errorMessage ? [holeNameValidation.errorMessage] : []),
+                      ...rangeLetterValidation.messages,
+                      ...qaqcLetterValidation.messages,
+                    ]
                       .filter((msg) => msg !== errorMsg)
                       .map((msg, i) => (
                         <li key={i}>{msg}</li>
@@ -438,16 +461,26 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder={selectedHoleType === 'RC' ? 'Ex: GURC-26-010' : 'Ex: GUD-26-051'}
+                  placeholder={`Ex: ${activeTypeConfig?.exampleHoleName || 'GUD-26-082'}`}
                   value={code}
                   onChange={(e) => {
                     setErrorMsg('');
                     setCode(e.target.value.toUpperCase());
                   }}
                   onBlur={(e) => setCode(normalizeSampleCode(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-white font-mono font-bold uppercase outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                  aria-invalid={!holeNameValidation.isValid}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-mono font-bold uppercase outline-none transition-colors ${
+                    !holeNameValidation.isValid
+                      ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400 focus:ring-1 focus:ring-red-400/50'
+                      : 'border-slate-700 bg-slate-800 text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500'
+                  }`}
                   required
                 />
+                {!holeNameValidation.isValid && holeNameValidation.errorMessage && (
+                  <p className="mt-1 text-[11px] text-red-300 font-medium">
+                    {holeNameValidation.errorMessage}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -595,7 +628,7 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
               </div>
 
               {/* Auto AR Breakdown Banner */}
-              {totalSamples > 0 && multiCheck.isValid && !hasRealTimeLetterErrors && (
+              {totalSamples > 0 && multiCheck.isValid && !hasRealTimeErrors && (
                 <div className="p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-800/80 text-xs flex flex-col gap-1.5 font-mono mt-1">
                   <div className="flex items-center justify-between text-cyan-300 font-bold">
                     <span>
@@ -635,7 +668,9 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
                 oreasStockEntries={oreasStockEntries}
                 ars={ars}
                 codeErrorsById={qaqcLetterValidation.errorsById}
+                codeErrorListById={qaqcLetterValidation.errorListById}
                 codeValidationMessages={qaqcLetterValidation.messages}
+                invalidCodeCount={qaqcLetterValidation.invalidCount}
                 expectedLetterHint={expectedQaqcHint}
               />
             </div>
@@ -702,9 +737,9 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={hasRealTimeLetterErrors}
+                disabled={hasRealTimeErrors}
                 className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 ${
-                  hasRealTimeLetterErrors
+                  hasRealTimeErrors
                     ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
                     : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-lg shadow-amber-500/20 cursor-pointer'
                 }`}

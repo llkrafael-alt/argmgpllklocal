@@ -22,6 +22,8 @@ import {
   getHoleTypeBadgeClass,
   getHoleTypeLabel,
   isValidHoleType,
+  normalizeSampleCode,
+  validateHoleNameForType,
 } from '../constants/holeTypes';
 import { QaqcTableGrid } from './QaqcTableGrid';
 import {
@@ -468,68 +470,109 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {/* Hole Card Header */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
                         <div className="flex-1">
-                          {editingHoleId === hole.id ? (
-                            <div className="flex flex-wrap items-end gap-2 p-3 bg-slate-950 border border-amber-500/40 rounded-xl mb-2">
-                              <div className="flex-1 min-w-[150px]">
-                                <label className="text-[10px] text-slate-400 font-bold block mb-1">CÓDIGO DO FURO / AMOSTRA</label>
-                                <input
-                                  type="text"
-                                  value={editCodeInput}
-                                  onChange={(e) => setEditCodeInput(e.target.value.toUpperCase())}
-                                  className="w-full px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-sm font-bold outline-none focus:border-amber-500"
-                                />
+                          {editingHoleId === hole.id ? (() => {
+                            const normalizedOrigType = isValidHoleType(hole.holeType) ? hole.holeType : '';
+                            const normalizedEditType = isValidHoleType(editHoleTypeInput) ? editHoleTypeInput : '';
+                            const nameOrTypeChanged =
+                              normalizeSampleCode(editCodeInput) !== normalizeSampleCode(hole.code) ||
+                              normalizedEditType !== normalizedOrigType;
+                            const inlineNameValidation = nameOrTypeChanged
+                              ? validateHoleNameForType(
+                                  editCodeInput,
+                                  isValidHoleType(editHoleTypeInput) ? editHoleTypeInput : undefined
+                                )
+                              : { isValid: true, errorMessage: undefined };
+
+                            return (
+                              <div className="flex flex-col gap-2 p-3 bg-slate-950 border border-amber-500/40 rounded-xl mb-2">
+                                <div className="flex flex-wrap items-end gap-2">
+                                  <div className="flex-1 min-w-[150px]">
+                                    <label className="text-[10px] text-slate-400 font-bold block mb-1">CÓDIGO DO FURO / AMOSTRA</label>
+                                    <input
+                                      type="text"
+                                      value={editCodeInput}
+                                      onChange={(e) => setEditCodeInput(e.target.value.toUpperCase())}
+                                      onBlur={(e) => setEditCodeInput(normalizeSampleCode(e.target.value))}
+                                      aria-invalid={!inlineNameValidation.isValid}
+                                      className={`w-full px-2.5 py-1 rounded-lg border font-mono text-sm font-bold outline-none ${
+                                        !inlineNameValidation.isValid
+                                          ? 'border-red-500 bg-red-950/60 text-red-100 focus:border-red-400'
+                                          : 'border-slate-700 bg-slate-900 text-white focus:border-amber-500'
+                                      }`}
+                                    />
+                                  </div>
+                                  <div className="w-28">
+                                    <label className="text-[10px] text-slate-400 font-bold block mb-1">ALVO</label>
+                                    <input
+                                      type="text"
+                                      value={editTargetInput}
+                                      onChange={(e) => setEditTargetInput(e.target.value.toUpperCase())}
+                                      className="w-full px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-bold outline-none focus:border-amber-500"
+                                    />
+                                  </div>
+                                  <div className="w-40">
+                                    <label className="text-[10px] text-slate-400 font-bold block mb-1">TIPO DE FURO</label>
+                                    <select
+                                      value={editHoleTypeInput}
+                                      onChange={(e) => setEditHoleTypeInput((e.target.value as HoleType) || '')}
+                                      className="w-full px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-bold outline-none focus:border-amber-500 cursor-pointer"
+                                    >
+                                      <option value="">Sem tipo</option>
+                                      {HOLE_TYPE_ORDER.map((tKey) => (
+                                        <option key={tKey} value={tKey}>
+                                          {HOLE_TYPE_CONFIG[tKey].label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="flex items-center gap-1 mt-4">
+                                    <button
+                                      type="button"
+                                      disabled={!inlineNameValidation.isValid || !editCodeInput.trim()}
+                                      onClick={() => {
+                                        const normalized = normalizeSampleCode(editCodeInput);
+                                        if (!normalized) return;
+                                        if (nameOrTypeChanged) {
+                                          const check = validateHoleNameForType(
+                                            normalized,
+                                            isValidHoleType(editHoleTypeInput) ? editHoleTypeInput : undefined
+                                          );
+                                          if (!check.isValid) return;
+                                        }
+                                        onUpdateHoleInfo?.(
+                                          hole.id,
+                                          normalized,
+                                          editTargetInput,
+                                          isValidHoleType(editHoleTypeInput) ? editHoleTypeInput : ''
+                                        );
+                                        setEditingHoleId(null);
+                                      }}
+                                      className={`px-3 py-1 font-bold text-xs rounded-lg transition-all ${
+                                        !inlineNameValidation.isValid || !editCodeInput.trim()
+                                          ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                                          : 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer'
+                                      }`}
+                                    >
+                                      Salvar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingHoleId(null)}
+                                      className="px-2 py-1 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs rounded-lg transition-all"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                                {!inlineNameValidation.isValid && inlineNameValidation.errorMessage && (
+                                  <p className="text-[11px] text-red-300 font-medium flex items-center gap-1.5">
+                                    <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                    <span>{inlineNameValidation.errorMessage}</span>
+                                  </p>
+                                )}
                               </div>
-                              <div className="w-28">
-                                <label className="text-[10px] text-slate-400 font-bold block mb-1">ALVO</label>
-                                <input
-                                  type="text"
-                                  value={editTargetInput}
-                                  onChange={(e) => setEditTargetInput(e.target.value.toUpperCase())}
-                                  className="w-full px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-bold outline-none focus:border-amber-500"
-                                />
-                              </div>
-                              <div className="w-40">
-                                <label className="text-[10px] text-slate-400 font-bold block mb-1">TIPO DE FURO</label>
-                                <select
-                                  value={editHoleTypeInput}
-                                  onChange={(e) => setEditHoleTypeInput((e.target.value as HoleType) || '')}
-                                  className="w-full px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-bold outline-none focus:border-amber-500 cursor-pointer"
-                                >
-                                  <option value="">Sem tipo</option>
-                                  {HOLE_TYPE_ORDER.map((tKey) => (
-                                    <option key={tKey} value={tKey}>
-                                      {HOLE_TYPE_CONFIG[tKey].label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="flex items-center gap-1 mt-4">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (!editCodeInput.trim()) return;
-                                    onUpdateHoleInfo?.(
-                                      hole.id,
-                                      editCodeInput,
-                                      editTargetInput,
-                                      isValidHoleType(editHoleTypeInput) ? editHoleTypeInput : ''
-                                    );
-                                    setEditingHoleId(null);
-                                  }}
-                                  className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition-all"
-                                >
-                                  Salvar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingHoleId(null)}
-                                  className="px-2 py-1 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs rounded-lg transition-all"
-                                >
-                                  Cancelar
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
+                            );
+                          })() : (
                             <div className="flex flex-wrap items-center gap-2">
                               <h3 className="text-xl font-black font-mono text-white tracking-tight">
                                 {hole.code}

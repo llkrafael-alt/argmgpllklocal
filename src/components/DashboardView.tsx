@@ -801,10 +801,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <div className="flex items-center justify-between px-1">
                           <h3 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                            <span>Reenvio / Reanálise ({reenvioHoles.length})</span>
+                            <span>Envio Especial ({reenvioHoles.length})</span>
                           </h3>
                           <span className="text-[11px] text-purple-300/80">
-                            Grupo separado de reenvios e reanálises
+                            Grupo separado de envios especiais
                           </span>
                         </div>
                         <div className="flex flex-col gap-5">

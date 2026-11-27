@@ -113,7 +113,7 @@ export const LogProductionModal: React.FC<LogProductionModalProps> = ({
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full text-center">
           <p className="text-slate-300 mb-4">
-            Nenhum furo de Diamantado ou RC ativo encontrado para realizar apontamentos. Furos dos tipos Solo, Trincheira e Reenvio/Reanálise não possuem lançamento de etapas.
+            Nenhum furo de Diamantado ou RC ativo encontrado para realizar apontamentos. Furos dos tipos Solo, Trincheira e Envio Especial não possuem lançamento de etapas.
           </p>
           <button
             onClick={onClose}

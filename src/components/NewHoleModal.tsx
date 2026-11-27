@@ -708,18 +708,18 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
               </div>
             </div>
 
-            {/* Observações (Motivo do Reenvio quando Reenvio/Reanálise) */}
+            {/* Observações (Motivo quando Envio Especial) */}
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">
                 {selectedHoleType === 'Reenvio'
-                  ? 'Observações / Motivo do Reenvio ou Reanálise'
+                  ? 'Observações / Motivo do Envio Especial'
                   : 'Observações do Plano de Amostragem'}
               </label>
               <input
                 type="text"
                 placeholder={
                   selectedHoleType === 'Reenvio'
-                    ? 'Ex: Reanálise de teor elevado, reenvio de polpa ou solicitação do laboratório'
+                    ? 'Ex: Reanálise de teor elevado, envio especial, polpa ou solicitação do laboratório'
                     : 'Ex: Laboratório ALS, Lote Especial'
                 }
                 value={notes}

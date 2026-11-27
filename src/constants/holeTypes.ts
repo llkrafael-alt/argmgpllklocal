@@ -7,6 +7,7 @@ export interface HoleTypeConfig {
   label: string;
   shortLabel: string;
   allowedLetters: readonly string[];
+  allowAnyStartingLetter?: boolean;
   letterHint: string;
   requiredNamePrefix?: string;
   exampleHoleName: string;
@@ -116,14 +117,15 @@ export const HOLE_TYPE_CONFIG: Record<HoleType, HoleTypeConfig> = {
   },
   Reenvio: {
     type: 'Reenvio',
-    label: 'Reenvio/Reanálise',
-    shortLabel: 'Reenvio/Reanálise',
-    allowedLetters: ['D', 'R', 'T', 'S'],
-    letterHint: 'D, R, T ou S',
+    label: 'Envio Especial',
+    shortLabel: 'Envio Especial',
+    allowedLetters: [],
+    allowAnyStartingLetter: true,
+    letterHint: 'Qualquer letra',
     exampleHoleName: 'GUD-26-010',
-    exampleStart: 'R00001',
-    exampleEnd: 'R00100',
-    description: 'Reenvio ou reanálise. Nome livre e aceita códigos iniciados em D, R, T ou S.',
+    exampleStart: 'E00001',
+    exampleEnd: 'E00100',
+    description: 'Envio especial (reenvio, reanálise ou avulso). Nome livre e aceita qualquer letra inicial.',
     badgeClass: 'bg-purple-500/20 text-purple-300 border border-purple-500/40',
     cardClass:
       'border-purple-500/40 bg-purple-950/20 hover:bg-purple-500/15 hover:border-purple-400 active:scale-[0.99]',
@@ -278,7 +280,10 @@ export function validateSampleRangesForHoleType(
   const detectedLetters = new Set<string>();
 
   const config = holeType && isValidHoleType(holeType) ? HOLE_TYPE_CONFIG[holeType] : null;
-  const allowedLetters = config ? config.allowedLetters : null;
+  const allowedLetters =
+    config && !config.allowAnyStartingLetter && config.allowedLetters.length > 0
+      ? config.allowedLetters
+      : null;
   const isMulti = ranges.length > 1;
 
   ranges.forEach((range, idx) => {
@@ -392,27 +397,29 @@ export function validateQaqcSamplesForHoleType(
   options?: QaqcValidationOptions
 ): QaqcValidationResult {
   const config = holeType && isValidHoleType(holeType) ? HOLE_TYPE_CONFIG[holeType] : null;
+  const allowAnyLetter = Boolean(config?.allowAnyStartingLetter);
   const allowedByType = config ? [...config.allowedLetters] : [];
 
   const rangeLettersSet = new Set<string>();
   ranges.forEach((r) => {
     const f = getSampleCodeStartingLetter(r.firstSampleCode);
     const l = getSampleCodeStartingLetter(r.lastSampleCode);
-    if (f && (!config || allowedByType.includes(f))) {
+    if (f && (!config || allowAnyLetter || allowedByType.includes(f))) {
       rangeLettersSet.add(f);
     }
-    if (l && (!config || allowedByType.includes(l))) {
+    if (l && (!config || allowAnyLetter || allowedByType.includes(l))) {
       rangeLettersSet.add(l);
     }
   });
 
   const rangeLetters = Array.from(rangeLettersSet);
-  const expectedLetters =
-    config && config.allowedLetters.length === 1
-      ? [...config.allowedLetters]
-      : rangeLetters.length > 0
-      ? rangeLetters
-      : allowedByType;
+  const expectedLetters = allowAnyLetter
+    ? []
+    : config && config.allowedLetters.length === 1
+    ? [...config.allowedLetters]
+    : rangeLetters.length > 0
+    ? rangeLetters
+    : allowedByType;
 
   const errorsById: Record<string, string> = {};
   const errorListById: Record<string, string[]> = {};

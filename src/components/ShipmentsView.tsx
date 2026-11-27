@@ -941,7 +941,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                       <div className="flex items-center justify-between px-1">
                         <h3 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-purple-400" />
-                          <span>Reenvio / Reanálise ({reenvioARs.length})</span>
+                          <span>Envio Especial ({reenvioARs.length})</span>
                         </h3>
                         <span className="text-[10px] text-purple-300/80 font-mono">Grupo próprio</span>
                       </div>
@@ -978,10 +978,10 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                          Reenvio / Reanálise ({reenvioARs.length} {reenvioARs.length === 1 ? 'remessa' : 'remessas'})
+                          Envio Especial ({reenvioARs.length} {reenvioARs.length === 1 ? 'remessa' : 'remessas'})
                         </h3>
                         <span className="text-[11px] text-purple-300/80 font-mono">
-                          Grupo próprio de remessas de reenvio e reanálise
+                          Grupo próprio de remessas de envio especial
                         </span>
                       </div>
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { User } from '../types';
 import { AppThemeId, THEME_OPTIONS } from '../types/themes';
+import { AppTab, SHOW_FUROS_TAB } from '../constants/navigation';
 import { AppLogo } from './AppLogo';
 import {
   Users,
@@ -26,8 +27,8 @@ interface HeaderProps {
   onOpenThemeModal?: () => void;
   isFolderLinked?: boolean;
   folderName?: string | null;
-  activeTab: 'dashboard' | 'shipments' | 'team';
-  setActiveTab: (tab: 'dashboard' | 'shipments' | 'team') => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
   onResetDemoData: () => void;
   holesCount: number;
   arsCount?: number;
@@ -213,23 +214,25 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Navigation Tabs Bar */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pt-2 pb-0 scrollbar-none snap-x">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`px-3 py-2.5 sm:px-4 sm:py-3 font-bold text-xs flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap min-h-[44px] shrink-0 snap-start ${
-              activeTab === 'dashboard'
-                ? 'border-amber-500 text-amber-400 bg-slate-800/60 rounded-t-lg'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <LayoutDashboard className="w-4 h-4 shrink-0" />
-            <span>
-              <span className="inline sm:hidden">Furos & Planos</span>
-              <span className="hidden sm:inline">Furos & Planos de Amostragem</span>
-            </span>
-            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[10px] text-amber-300 font-mono">
-              {holesCount}
-            </span>
-          </button>
+          {SHOW_FUROS_TAB && (
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-3 py-2.5 sm:px-4 sm:py-3 font-bold text-xs flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all whitespace-nowrap min-h-[44px] shrink-0 snap-start ${
+                activeTab === 'dashboard'
+                  ? 'border-amber-500 text-amber-400 bg-slate-800/60 rounded-t-lg'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4 shrink-0" />
+              <span>
+                <span className="inline sm:hidden">Furos & Planos</span>
+                <span className="hidden sm:inline">Furos & Planos de Amostragem</span>
+              </span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[10px] text-amber-300 font-mono">
+                {holesCount}
+              </span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('shipments')}

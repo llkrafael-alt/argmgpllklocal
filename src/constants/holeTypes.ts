@@ -32,9 +32,9 @@ export const HOLE_NAME_PREFIX_BY_TYPE: Partial<
 };
 
 /**
- * Dígitos finais permitidos para os códigos de padrões QA/QC (OREAS, BLK, DUP).
- * Vale para todos os tipos de furo (inclusive Reenvio/Reanálise e Solo).
- * Para ajustar os finais aceitos no futuro, basta editar esta constante.
+ * Dígitos finais esperados por padrão para os códigos QA/QC (OREAS, BLK, DUP).
+ * Finais diferentes desses continuam sendo aceitos, porém exibem aviso de possível numeração errada.
+ * Para ajustar os finais esperados no futuro, basta editar esta constante.
  */
 export const QAQC_ALLOWED_END_DIGITS = ['0', '1', '5'] as const;
 
@@ -44,7 +44,7 @@ function formatListPt(items: readonly string[]): string {
   return `${items.slice(0, -1).join(', ')} ou ${items[items.length - 1]}`;
 }
 
-export const QAQC_END_DIGIT_ERROR_MESSAGE = `Código de padrão deve terminar em ${formatListPt(QAQC_ALLOWED_END_DIGITS)}`;
+export const QAQC_END_DIGIT_WARNING_MESSAGE = `O padrão pode estar com a numeração errada (geralmente termina em ${formatListPt(QAQC_ALLOWED_END_DIGITS)})`;
 
 /**
  * Mapeamento centralizado de Tipos de Furo para Letras de Código de Amostra e Prefixos.
@@ -380,10 +380,10 @@ export function hasValidQaqcEndDigit(code: string): boolean {
 
 /**
  * Valida códigos de padrões QA/QC (OREAS, BLK, DUP).
- * 1) Letra inicial: mesma letra das amostras da faixa do furo (ou permitida pelo tipo).
- * 2) Dígito final: deve terminar em QAQC_ALLOWED_END_DIGITS (0, 1 ou 5) para todos os tipos.
- * Se ambos estiverem errados, reporta os dois erros.
- * Padrões já salvos não alterados recebem aviso discreto (warningsById) sem bloquear salvamento.
+ * 1) Letra inicial (bloqueante): mesma letra das amostras da faixa do furo (ou permitida pelo tipo).
+ * 2) Dígito final (aviso não bloqueante): permite qualquer numeração no final (ex: D00001, D00002),
+ *    mas exibe aviso quando o final for diferente de QAQC_ALLOWED_END_DIGITS (0, 1 ou 5).
+ * Padrões já salvos não alterados com letra incompatível recebem aviso discreto sem bloquear salvamento.
  */
 export function validateQaqcSamplesForHoleType(
   qaqcSamples: QaQcSample[],
@@ -434,9 +434,10 @@ export function validateQaqcSamplesForHoleType(
     const isUntouchedLegacy = legacyOriginal !== undefined && legacyOriginal === code;
 
     const cat = getQaqcCategoryLabel(sample.type);
-    const rowIssues: string[] = [];
+    const rowBlockingIssues: string[] = [];
+    const rowWarnings: string[] = [];
 
-    // 1. Validação da letra inicial (quando houver tipo/faixa configurados)
+    // 1. Validação da letra inicial (bloqueante quando houver tipo/faixa configurados)
     if (expectedLetters.length > 0) {
       const letter = getSampleCodeStartingLetter(code);
       if (!expectedLetters.includes(letter)) {
@@ -446,30 +447,37 @@ export function validateQaqcSamplesForHoleType(
             : rangeLetters.length > 0
             ? `Os padrões QA/QC devem ter a mesma letra das amostras da faixa (${expectedText}). O padrão ${cat} '${code}' começa com ${letter}.`
             : `Para ${config?.label || 'este tipo'}, os códigos devem começar com ${expectedText}. O padrão ${cat} '${code}' começa com ${letter}.`;
-        rowIssues.push(letterMsg);
+        if (isUntouchedLegacy) {
+          rowWarnings.push(`Padrão salvo anteriormente fora da regra de letra: ${letterMsg}`);
+        } else {
+          rowBlockingIssues.push(letterMsg);
+        }
       }
     }
 
-    // 2. Validação do dígito final (0, 1 ou 5) - vale para todos os tipos (inclusive Solo e Reenvio)
+    // 2. Aviso não bloqueante para dígito final diferente de 0, 1 ou 5 (permite salvar qualquer final)
     if (!hasValidQaqcEndDigit(code)) {
-      rowIssues.push(`${QAQC_END_DIGIT_ERROR_MESSAGE} (${cat} '${code}').`);
+      const lastChar = code.charAt(code.length - 1);
+      rowWarnings.push(
+        `Aviso (${cat} '${code}'): final '${lastChar}' diferente de ${formatListPt(QAQC_ALLOWED_END_DIGITS)} — o padrão pode estar com a numeração errada.`
+      );
     }
 
-    if (rowIssues.length > 0) {
-      if (isUntouchedLegacy) {
-        const warnText = `Padrão salvo anteriormente fora da regra atual: ${rowIssues.join(' • ')}`;
-        if (sample.id) {
-          warningsById[sample.id] = warnText;
-        }
-        warningMessages.push(warnText);
-      } else {
-        invalidCount += 1;
-        if (sample.id) {
-          errorsById[sample.id] = rowIssues.join(' • ');
-          errorListById[sample.id] = rowIssues;
-        }
-        rowIssues.forEach((issue) => messages.push(issue));
+    if (rowBlockingIssues.length > 0) {
+      invalidCount += 1;
+      if (sample.id) {
+        errorsById[sample.id] = rowBlockingIssues.join(' • ');
+        errorListById[sample.id] = rowBlockingIssues;
       }
+      rowBlockingIssues.forEach((issue) => messages.push(issue));
+    }
+
+    if (rowWarnings.length > 0) {
+      const warnText = rowWarnings.join(' • ');
+      if (sample.id) {
+        warningsById[sample.id] = warnText;
+      }
+      rowWarnings.forEach((w) => warningMessages.push(w));
     }
   });
 

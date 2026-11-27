@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, DrillHole, HoleType, SampleShipmentAR, OreasStockEntry, QaQcSample, SampleRange, QAQCSamplePhoto, ProductionLog } from './types';
 import { getHoleTypeLabel, isValidHoleType } from './constants/holeTypes';
+import {
+  AppTab,
+  SHOW_FUROS_TAB,
+  ACTIVE_TAB_STORAGE_KEY,
+  resolveSafeActiveTab,
+} from './constants/navigation';
 import { loadActiveUserId, saveActiveUserId } from './utils/storage';
 import {
   subscribeUsers,
@@ -159,8 +165,37 @@ export default function App() {
     isWriting: false,
   });
 
-  // Tab view
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'shipments' | 'team'>('dashboard');
+  // Tab view (defaults to Remessas when Furos tab is hidden; falls back safely if saved tab is hidden)
+  const [activeTab, setActiveTab] = useState<AppTab>(() => {
+    try {
+      return resolveSafeActiveTab(localStorage.getItem(ACTIVE_TAB_STORAGE_KEY));
+    } catch {
+      return resolveSafeActiveTab(null);
+    }
+  });
+
+  const safeActiveTab = resolveSafeActiveTab(activeTab);
+
+  useEffect(() => {
+    if (activeTab !== safeActiveTab) {
+      setActiveTab(safeActiveTab);
+      try {
+        localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, safeActiveTab);
+      } catch {
+        // Ignore storage errors
+      }
+    }
+  }, [activeTab, safeActiveTab]);
+
+  const handleSetActiveTab = useCallback((nextTab: AppTab) => {
+    const resolved = resolveSafeActiveTab(nextTab);
+    setActiveTab(resolved);
+    try {
+      localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, resolved);
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -1134,8 +1169,8 @@ export default function App() {
         onOpenThemeModal={() => setIsThemeModalOpen(true)}
         isFolderLinked={folderSyncState.isLinked}
         folderName={folderSyncState.folderName}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        activeTab={safeActiveTab}
+        setActiveTab={handleSetActiveTab}
         onResetDemoData={handleResetData}
         holesCount={holes.length}
         arsCount={ars.length}
@@ -1145,7 +1180,7 @@ export default function App() {
 
       {/* Main Body View */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        {activeTab === 'dashboard' && (
+        {SHOW_FUROS_TAB && safeActiveTab === 'dashboard' && (
           <DashboardView
             holes={holes}
             ars={ars}
@@ -1162,7 +1197,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'shipments' && (
+        {safeActiveTab === 'shipments' && (
           <ShipmentsView
             ars={ars}
             holes={holes}
@@ -1183,7 +1218,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'team' && (
+        {safeActiveTab === 'team' && (
           <UserPanel
             users={users}
             logs={logs}

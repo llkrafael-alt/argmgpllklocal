@@ -730,7 +730,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
           const isFilled = row.code.trim() !== '';
           const codeError = isFilled && codeErrorsById ? codeErrorsById[row.id] : undefined;
           const codeErrorList = isFilled && codeErrorListById ? codeErrorListById[row.id] : undefined;
-          const codeWarning = !codeError && isFilled && codeWarningsById ? codeWarningsById[row.id] : undefined;
+          const codeWarning = isFilled && codeWarningsById ? codeWarningsById[row.id] : undefined;
           const stockInfo = lotKey
             ? getAvailableStockForCode(row.lot.trim(), oreasStockEntries, ars, currentArId)
             : null;
@@ -958,7 +958,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
           const isFilled = row.code.trim() !== '';
           const codeError = isFilled && codeErrorsById ? codeErrorsById[row.id] : undefined;
           const codeErrorList = isFilled && codeErrorListById ? codeErrorListById[row.id] : undefined;
-          const codeWarning = !codeError && isFilled && codeWarningsById ? codeWarningsById[row.id] : undefined;
+          const codeWarning = isFilled && codeWarningsById ? codeWarningsById[row.id] : undefined;
 
           return (
             <div
@@ -1129,7 +1129,7 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
           const isFilled = row.code.trim() !== '';
           const codeError = isFilled && codeErrorsById ? codeErrorsById[row.id] : undefined;
           const codeErrorList = isFilled && codeErrorListById ? codeErrorListById[row.id] : undefined;
-          const codeWarning = !codeError && isFilled && codeWarningsById ? codeWarningsById[row.id] : undefined;
+          const codeWarning = isFilled && codeWarningsById ? codeWarningsById[row.id] : undefined;
 
           return (
             <div
@@ -1437,15 +1437,20 @@ export const QaqcGridInput: React.FC<QaqcGridInputProps> = ({
         );
       })()}
 
-      {/* Discrete non-blocking warning banner for legacy saved QA/QC standards */}
+      {/* Non-blocking warning banner for QA/QC numbering or legacy saved standards */}
       {codeWarningMessages.length > 0 && (
-        <div className="p-2.5 rounded-xl bg-amber-950/35 border border-amber-700/40 text-amber-200/90 text-[11px] flex flex-col gap-1">
-          <div className="font-semibold flex items-center gap-1.5 text-amber-300">
-            <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+        <div className="p-3 rounded-xl bg-amber-950/45 border border-amber-600/60 text-amber-200 text-xs flex flex-col gap-1">
+          <div className="font-bold flex items-center gap-1.5 text-amber-300">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              Aviso: {codeWarningMessages.length} {codeWarningMessages.length === 1 ? 'padrão salvo anteriormente está' : 'padrões salvos anteriormente estão'} fora da regra atual (mantido(s) sem impedir o salvamento).
+              Aviso ({codeWarningMessages.length} {codeWarningMessages.length === 1 ? 'padrão' : 'padrões'}): o padrão pode estar com a numeração errada (permitido salvar normalmente).
             </span>
           </div>
+          <ul className="list-disc list-inside space-y-0.5 pl-1 text-[11px] text-amber-200/90">
+            {codeWarningMessages.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
         </div>
       )}
 

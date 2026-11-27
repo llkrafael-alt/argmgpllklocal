@@ -669,7 +669,9 @@ export const NewHoleModal: React.FC<NewHoleModalProps> = ({
                 ars={ars}
                 codeErrorsById={qaqcLetterValidation.errorsById}
                 codeErrorListById={qaqcLetterValidation.errorListById}
+                codeWarningsById={qaqcLetterValidation.warningsById}
                 codeValidationMessages={qaqcLetterValidation.messages}
+                codeWarningMessages={qaqcLetterValidation.warningMessages}
                 invalidCodeCount={qaqcLetterValidation.invalidCount}
                 expectedLetterHint={expectedQaqcHint}
               />

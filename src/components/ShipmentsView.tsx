@@ -7,7 +7,9 @@ import {
   HOLE_TYPE_ORDER,
   getHoleTypeBadgeClass,
   getHoleTypeLabel,
+  normalizeSampleCode,
   resolveArHoleType,
+  validateHoleNameForType,
 } from '../constants/holeTypes';
 import { saveARToDb } from '../services/firebase';
 import { QaqcTableGrid } from './QaqcTableGrid';
@@ -33,6 +35,7 @@ import {
   Check,
   X,
   Scale,
+  Eye,
 } from 'lucide-react';
 
 interface ShipmentsViewProps {
@@ -48,6 +51,7 @@ interface ShipmentsViewProps {
   onEditAR: (ar: SampleShipmentAR) => void;
   onUpdateARWeight?: (arId: string, weightKg: number) => void | Promise<void>;
   onUpdateARShipmentDate?: (arId: string, shipmentDate: string) => void | Promise<void>;
+  onUpdateARHoleName?: (arId: string, newHoleCode: string) => void | Promise<void>;
   onUpdateDuplicateMeter?: (arId: string, sampleIdOrCode: string, meter: string) => void | Promise<void>;
   onDeleteAR: (arId: string) => void;
   onOpenHoleDetailByCode: (holeCode: string) => void;
@@ -67,6 +71,7 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
   onEditAR,
   onUpdateARWeight,
   onUpdateARShipmentDate,
+  onUpdateARHoleName,
   onUpdateDuplicateMeter,
   onDeleteAR,
   onOpenHoleDetailByCode,
@@ -174,6 +179,59 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
       console.error('Erro ao salvar data de envio da AR:', err);
     } finally {
       setIsSavingDate(false);
+    }
+  };
+
+  // Inline hole name editing state
+  const [editingHoleNameArId, setEditingHoleNameArId] = useState<string | null>(null);
+  const [editingHoleNameValue, setEditingHoleNameValue] = useState<string>('');
+  const [isSavingHoleName, setIsSavingHoleName] = useState(false);
+
+  const handleStartEditHoleName = (ar: SampleShipmentAR) => {
+    setEditingHoleNameArId(ar.id);
+    setEditingHoleNameValue(ar.drillHoleCode || '');
+  };
+
+  const handleCancelEditHoleName = () => {
+    setEditingHoleNameArId(null);
+    setEditingHoleNameValue('');
+  };
+
+  const getHoleNameValidation = (ar: SampleShipmentAR, arType: HoleType | undefined) => {
+    const normalizedValue = normalizeSampleCode(editingHoleNameValue);
+    const originalNormalized = normalizeSampleCode(ar.drillHoleCode);
+    if (!normalizedValue) {
+      return { isValid: false, errorMessage: 'Informe o nome do furo.' };
+    }
+    if (normalizedValue === originalNormalized) {
+      return { isValid: true, errorMessage: undefined };
+    }
+    return validateHoleNameForType(normalizedValue, arType);
+  };
+
+  const handleSaveHoleName = async (ar: SampleShipmentAR, arType: HoleType | undefined) => {
+    const normalizedValue = normalizeSampleCode(editingHoleNameValue);
+    const validation = getHoleNameValidation(ar, arType);
+    if (!validation.isValid) return;
+
+    if (normalizedValue === normalizeSampleCode(ar.drillHoleCode)) {
+      handleCancelEditHoleName();
+      return;
+    }
+
+    setIsSavingHoleName(true);
+    try {
+      if (onUpdateARHoleName) {
+        await onUpdateARHoleName(ar.id, normalizedValue);
+      } else {
+        await saveARToDb({ ...ar, drillHoleCode: normalizedValue });
+      }
+      setEditingHoleNameArId(null);
+      setEditingHoleNameValue('');
+    } catch (err) {
+      console.error('Erro ao salvar nome do furo:', err);
+    } finally {
+      setIsSavingHoleName(false);
     }
   };
 
@@ -468,14 +526,85 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                       <span className="font-mono font-black text-cyan-300 px-2.5 py-1 rounded bg-cyan-950/90 border border-cyan-800 text-xs">
                         {ar.arCode}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => onOpenHoleDetailByCode(ar.drillHoleCode)}
-                        className="font-mono font-bold text-white hover:text-amber-400 text-xs hover:underline transition-colors"
-                        title="Clique para ver o histórico do furo"
-                      >
-                        {ar.drillHoleCode}
-                      </button>
+                      {editingHoleNameArId === ar.id ? (
+                        (() => {
+                          const holeNameValidation = getHoleNameValidation(ar, arType);
+                          return (
+                            <div className="flex flex-col items-start gap-1">
+                              <div
+                                className={`flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border shadow-md ${
+                                  holeNameValidation.isValid ? 'border-amber-500' : 'border-red-500'
+                                }`}
+                              >
+                                <input
+                                  type="text"
+                                  autoFocus
+                                  value={editingHoleNameValue}
+                                  onChange={(e) => setEditingHoleNameValue(e.target.value.toUpperCase())}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveHoleName(ar, arType);
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      handleCancelEditHoleName();
+                                    }
+                                  }}
+                                  placeholder="Nome do furo"
+                                  className="w-28 px-1.5 py-0.5 text-xs font-mono font-bold uppercase bg-slate-900 text-amber-200 rounded border border-slate-700 focus:outline-none focus:border-amber-400"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={isSavingHoleName || !holeNameValidation.isValid}
+                                  onClick={() => handleSaveHoleName(ar, arType)}
+                                  className="p-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
+                                  title="Salvar nome do furo (Enter)"
+                                >
+                                  <Check className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isSavingHoleName}
+                                  onClick={handleCancelEditHoleName}
+                                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                                  title="Cancelar (Esc)"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                              {!holeNameValidation.isValid && holeNameValidation.errorMessage && (
+                                <span className="text-[10px] text-red-400 font-medium leading-tight">
+                                  {holeNameValidation.errorMessage}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditHoleName(ar)}
+                            className="group inline-flex items-center gap-1 font-mono font-bold text-white hover:text-amber-300 text-xs transition-colors cursor-pointer"
+                            title="Clique para editar o nome do furo"
+                          >
+                            <span>{ar.drillHoleCode}</span>
+                            <Edit2 className="w-2.5 h-2.5 text-slate-500 group-hover:text-amber-400 transition-colors" />
+                          </button>
+                          {holes.some(
+                            (h) => h.code.toLowerCase() === (ar.drillHoleCode || '').toLowerCase()
+                          ) && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenHoleDetailByCode(ar.drillHoleCode)}
+                              className="p-1 rounded text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition-colors"
+                              title="Ver detalhes do furo"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </>
+                      )}
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getHoleTypeBadgeClass(arType)}`}>
                         {getHoleTypeLabel(arType)}
                       </span>
@@ -691,16 +820,90 @@ export const ShipmentsView: React.FC<ShipmentsViewProps> = ({
                   {/* Hole Code & Type Badge */}
                   <td className="py-3.5 px-3">
                     <div className="flex flex-col items-start gap-1">
-                      <button
-                        onClick={() => onOpenHoleDetailByCode(ar.drillHoleCode)}
-                        className="font-mono font-bold text-white hover:text-amber-400 hover:underline transition-colors"
-                        title="Clique para ver o histórico do furo"
-                      >
-                        {ar.drillHoleCode}
-                      </button>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${getHoleTypeBadgeClass(arType)}`}>
-                        {getHoleTypeLabel(arType)}
-                      </span>
+                      {editingHoleNameArId === ar.id ? (
+                        (() => {
+                          const holeNameValidation = getHoleNameValidation(ar, arType);
+                          return (
+                            <div className="flex flex-col items-start gap-1">
+                              <div
+                                className={`inline-flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-xl border shadow-lg ${
+                                  holeNameValidation.isValid
+                                    ? 'border-amber-500 shadow-amber-950/40'
+                                    : 'border-red-500 shadow-red-950/40'
+                                }`}
+                              >
+                                <input
+                                  type="text"
+                                  autoFocus
+                                  value={editingHoleNameValue}
+                                  onChange={(e) => setEditingHoleNameValue(e.target.value.toUpperCase())}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveHoleName(ar, arType);
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      handleCancelEditHoleName();
+                                    }
+                                  }}
+                                  placeholder="Nome do furo"
+                                  className="w-28 px-2 py-1 text-xs font-mono font-bold uppercase bg-slate-900 text-amber-200 rounded-lg border border-slate-700 focus:outline-none focus:border-amber-400"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={isSavingHoleName || !holeNameValidation.isValid}
+                                  onClick={() => handleSaveHoleName(ar, arType)}
+                                  className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
+                                  title="Salvar nome do furo (Enter)"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isSavingHoleName}
+                                  onClick={handleCancelEditHoleName}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                                  title="Cancelar (Esc)"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              {!holeNameValidation.isValid && holeNameValidation.errorMessage && (
+                                <span className="text-[10px] text-red-400 font-medium leading-tight max-w-[200px]">
+                                  {holeNameValidation.errorMessage}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditHoleName(ar)}
+                          className="group inline-flex items-center gap-1.5 font-mono font-bold text-white hover:text-amber-300 transition-colors cursor-pointer"
+                          title="Clique para editar o nome do furo"
+                        >
+                          <span>{ar.drillHoleCode}</span>
+                          <Edit2 className="w-3 h-3 text-slate-500 group-hover:text-amber-400 transition-colors" />
+                        </button>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${getHoleTypeBadgeClass(arType)}`}>
+                          {getHoleTypeLabel(arType)}
+                        </span>
+                        {holes.some(
+                          (h) => h.code.toLowerCase() === (ar.drillHoleCode || '').toLowerCase()
+                        ) && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenHoleDetailByCode(ar.drillHoleCode)}
+                            className="p-1 rounded text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition-colors"
+                            title="Ver detalhes do furo"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                       {arType === 'Reenvio' && ar.notes && !ar.notes.startsWith('AR gerado') && (
                         <span className="text-[10px] text-purple-300/90 max-w-[180px] truncate" title={ar.notes}>
                           {ar.notes}

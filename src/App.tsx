@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, DrillHole, HoleType, SampleShipmentAR, OreasStockEntry, QaQcSample, SampleRange, QAQCSamplePhoto, ProductionLog } from './types';
-import { getHoleTypeLabel, isValidHoleType } from './constants/holeTypes';
+import { getHoleTypeLabel, isValidHoleType, normalizeSampleCode, resolveArHoleType, validateHoleNameForType } from './constants/holeTypes';
 import {
   AppTab,
   SHOW_FUROS_TAB,
@@ -1029,6 +1029,102 @@ export default function App() {
     }
   };
 
+  const handleUpdateARHoleName = async (arId: string, newHoleCode: string) => {
+    try {
+      const targetAR = ars.find((a) => a.id === arId);
+      if (!targetAR) return;
+
+      const trimmedCode = normalizeSampleCode(newHoleCode);
+      if (!trimmedCode) {
+        triggerToast('O nome/código do furo não pode ser vazio.');
+        return;
+      }
+
+      const oldHoleCodeUpper = normalizeSampleCode(targetAR.drillHoleCode);
+      if (trimmedCode === oldHoleCodeUpper) return;
+
+      const effectiveHoleType = resolveArHoleType(targetAR, holes);
+      const nameValidation = validateHoleNameForType(trimmedCode, effectiveHoleType);
+      if (!nameValidation.isValid) {
+        triggerToast(
+          nameValidation.errorMessage || 'O nome do furo não corresponde ao prefixo esperado para este tipo.'
+        );
+        return;
+      }
+
+      const targetHole =
+        holes.find((h) => h.id === targetAR.drillHoleId) ||
+        holes.find(
+          (h) =>
+            h.code &&
+            oldHoleCodeUpper &&
+            normalizeSampleCode(h.code) === oldHoleCodeUpper
+        );
+
+      if (targetHole) {
+        const updatedHole: DrillHole = {
+          ...targetHole,
+          code: trimmedCode,
+        };
+        setHoles((prev) => prev.map((h) => (h.id === targetHole.id ? updatedHole : h)));
+        await saveHoleToDb(updatedHole);
+
+        const isRelatedAR = (a: SampleShipmentAR) =>
+          a.id === arId ||
+          a.drillHoleId === targetHole.id ||
+          (Boolean(oldHoleCodeUpper) && normalizeSampleCode(a.drillHoleCode) === oldHoleCodeUpper);
+
+        const relatedARs = ars.filter(isRelatedAR);
+        const relatedIds = new Set(relatedARs.map((a) => a.id));
+
+        if (relatedARs.length > 0) {
+          setARs((prev) =>
+            prev.map((a) => (relatedIds.has(a.id) ? { ...a, drillHoleCode: trimmedCode } : a))
+          );
+          setPackingPlanAR((current) =>
+            current && relatedIds.has(current.id)
+              ? { ...current, drillHoleCode: trimmedCode }
+              : current
+          );
+          for (const relatedAr of relatedARs) {
+            if (normalizeSampleCode(relatedAr.drillHoleCode) !== trimmedCode) {
+              await saveARToDb({ ...relatedAr, drillHoleCode: trimmedCode });
+            }
+          }
+        }
+
+        await logUserActivity(
+          'HOLE_UPDATED',
+          `Edição do Furo ${trimmedCode}`,
+          targetHole.id,
+          `Nome do furo alterado de ${oldHoleCodeUpper || targetAR.drillHoleCode} para ${trimmedCode} (via Remessa ${targetAR.arCode}).`
+        );
+
+        triggerToast(`Nome do furo atualizado para ${trimmedCode}!`);
+      } else {
+        const updatedAR: SampleShipmentAR = {
+          ...targetAR,
+          drillHoleCode: trimmedCode,
+        };
+        setARs((prev) => prev.map((a) => (a.id === arId ? updatedAR : a)));
+        setPackingPlanAR((current) => (current && current.id === arId ? updatedAR : current));
+        await saveARToDb(updatedAR);
+
+        await logUserActivity(
+          'HOLE_UPDATED',
+          `Edição do Furo ${trimmedCode} (${targetAR.arCode})`,
+          targetAR.drillHoleId || '',
+          `Nome do furo na remessa ${targetAR.arCode} alterado de ${oldHoleCodeUpper || targetAR.drillHoleCode} para ${trimmedCode}.`
+        );
+
+        triggerToast(`Nome do furo da AR ${targetAR.arCode} atualizado para ${trimmedCode}!`);
+      }
+    } catch (err: any) {
+      console.error('Erro ao atualizar nome do furo:', err);
+      triggerToast(`Erro ao atualizar nome do furo: ${err?.message || 'Falha na conexão'}`);
+    }
+  };
+
   const handleOpenHoleDetailByCode = (holeCode: string) => {
     const target = holes.find((h) => h.code.toLowerCase() === holeCode.toLowerCase());
     if (target) {
@@ -1211,6 +1307,7 @@ export default function App() {
             onEditAR={handleOpenEditARModal}
             onUpdateARWeight={handleUpdateARWeight}
             onUpdateARShipmentDate={handleUpdateARShipmentDate}
+            onUpdateARHoleName={handleUpdateARHoleName}
             onUpdateDuplicateMeter={handleUpdateARDuplicateMeter}
             onDeleteAR={handleDeleteAR}
             onOpenHoleDetailByCode={handleOpenHoleDetailByCode}
